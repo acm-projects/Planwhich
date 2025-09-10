@@ -51,16 +51,16 @@ Managing a project often means chasing down files, juggling tools, and trying to
 <details>
   <summary><strong>Week 2:</strong></summary>
   <br>
-  - **Frontend**: Finish up wireframes, start creating basic pages  
-  - **Backend**: Continue learning about AWS tools, create ER diagrams, identify relationships  
+  - Frontend: Finish up wireframes, start creating basic pages  
+  - Backend: Continue learning about AWS tools, create ER diagrams, identify relationships  
 </details>
 
 <details>
   <summary><strong>Week 3:</strong></summary>
   <br>
-  - **Frontend + Backend**: Set up Auth & Integrate  
-  - **Frontend**: Basic pages finished  
-  - **Backend**: Basic tables set  
+  - Frontend + Backend: Set up Auth & Integrate  
+  - Frontend: Basic pages finished  
+  - Backend: Basic tables set  
 </details>
 
 <details>
