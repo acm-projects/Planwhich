@@ -66,19 +66,19 @@ Managing a project often means chasing down files, juggling tools, and trying to
 <details>
   <summary><strong>Weeks 4–5:</strong></summary>
   <br>
-  - **Frontend + Backend**: Integrate GitHub Repo Feature  
+  - Frontend + Backend: Integrate GitHub Repo Feature  
 </details>
 
 <details>
   <summary><strong>Weeks 6–7:</strong></summary>
   <br>
-  - **Frontend + Backend**: Kanban task board and meeting log UI + Integration  
+  - Frontend + Backend: Kanban task board and meeting log UI + Integration  
 </details>
 
 <details>
   <summary><strong>Weeks 8–9:</strong></summary>
   <br>
-  - **Frontend + Backend**: Polish UI, begin email/calendar integrations, Presentation Prep  
+  - Frontend + Backend: Polish UI, begin email/calendar integrations, Presentation Prep  
 </details>
 
 <details>
