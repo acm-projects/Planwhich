@@ -1,5 +1,5 @@
 <p align="center">
-<img src='https://media4.giphy.com/media/l1Et9S6qY578FIJ3y/giphy.gif?cid=6c09b9521wzu6ur5dmne16p3xjuwkj7k7ooaccohkyue8nue&ep=v1_internal_gif_by_id&rid=giphy.gif&ct=g' width='700'>
+<img src='https://media.giphy.com/media/Rghq9s8RwVRyFxYYvB/giphy.gif' width='700'>
 </p>
 
 # <h1 align="center">🗂️ Planwhich 🗂️</h1>
