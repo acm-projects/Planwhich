@@ -12,9 +12,9 @@ Managing a project often means chasing down files, juggling tools, and trying to
 
 ## MVP ✔️
 
-* **Repository Creation**
-  * Auto-generate GitHub repos via GitHub API
-  * Preload default folder structures and permissions  
+* **Project Creation**
+  * Help users set up projects
+  * Add members, tasks, and organizational functions 
 
 * **Project Archive**
   * Upload notes, deck, documentation 
