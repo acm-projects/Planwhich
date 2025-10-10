@@ -1,6 +1,15 @@
+import { loadEnvConfig } from "@next/env";
 import Image from "next/image";
 
 export default function Home() {
+  const projectDir = process.cwd();
+  loadEnvConfig(projectDir);
+
+  console.log(process.env.AUTH0_CLIENT_ID);
+  console.log("hello", projectDir);
+
+  
+
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -21,11 +30,25 @@ export default function Home() {
             .
           </li>
           <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
+            Save and see your changes instantly. {/* {process.env} */}
+            {projectDir}
           </li>
         </ol>
 
         <div className="flex gap-4 items-center flex-col sm:flex-row">
+          {/* Auth0 Login/Logout Links */}
+          <a
+            className="rounded-full border border-solid border-blue-500 transition-colors flex items-center justify-center bg-blue-600 text-white gap-2 hover:bg-blue-700 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
+            href="/auth/login"
+          >
+            Login
+          </a>
+          <a
+            className="rounded-full border border-solid border-red-500 transition-colors flex items-center justify-center bg-red-600 text-white gap-2 hover:bg-red-700 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
+            href="/auth/logout"
+          >
+            Logout
+          </a>
           <a
             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
             href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
