@@ -1,0 +1,34 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "File",
+    "description": "A file uploaded in the system",
+    "type": "object",
+    "properties": {
+        "fileID": {
+            "type": "string",
+            "description": "Unique identifier for file"
+        },
+        "fileName": {
+            "type": "string",
+            "description": "Name of the file"
+        },
+        "uploaderID": {
+            "type": "string",
+            "description": "User ID of the uploader"
+        },
+        "projectID": {
+            "type": "string",
+            "description": "ID of the project this file belongs to"
+        },
+        "uploadDate": {
+            "type": "string",
+            "description": "Date the file was uploaded",
+            "format": "date-time"
+        },
+        "s3Key": {
+            "type": "string",
+            "description": "S3 key where the file is stored"
+        }
+    },
+    "required": ["fileID", "fileName", "uploaderID", "projectID", "uploadDate"]
+}

@@ -1,0 +1,47 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Task",
+    "description": "A task, thats assigned to a user(s) in the system",
+    "type": "object",
+    "properties": {
+        "taskID": {
+            "type": "string",
+            "description": "Unique identifier for task"
+        },
+        "taskName": {
+            "type": "string",
+            "description": "Name of the task"
+        },
+        "description": {
+            "type": "string",
+            "description": "Detailed description of the task"
+        },
+        "assignedUserIDs": {
+            "type": "array",
+            "description": "List of user IDs assigned to the task",
+            "items": {
+                "type": "string"
+            }
+        },
+        "projectID": {
+            "type": "string",
+            "description": "ID of the project this task belongs to"
+        },
+        "status": {
+            "type": "string",
+            "description": "Current status of the task",
+            "enum": ["To Do", "In Progress", "Done"]
+        },
+        "dateCreated": {
+            "type": "string",
+            "description": "Date the task was created",
+            "format": "date-time"
+        },
+        "dueDate": {
+            "type": "string",
+            "description": "Due date for the task",
+            "format": "date-time"
+        }
+    },
+    "required": ["taskID", "taskName", "description", "assignedUserIDs", "projectID", "status", "dateCreated"]
+}
