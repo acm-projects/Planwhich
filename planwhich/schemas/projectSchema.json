@@ -1,0 +1,47 @@
+{
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "title": "Project",
+     "description": "A project in the system",
+     "type": "object",
+     "properties": {
+        "projectId": {
+            "type": "string",
+            "description": "Unique identifier for project"
+        },
+        "projectName": {
+            "type": "string",
+            "description": "Name of the project"
+        },
+        "projectManagerID": {
+            "type": "string",
+            "description": "User ID of the project manager"
+        },
+        "dateCreated": {
+            "type": "string",
+            "description": "Date the user was created",
+            "format": "date-time"
+        },
+        "taskIDs": {
+            "type": "array",
+            "description": "List of task IDs associated with the project",
+            "items": {
+                "type": "string"
+            }
+        },
+        "memberIDs": {
+            "type": "array",
+            "description": "List of member IDs associated with the project",
+            "items": {
+                "type": "string"
+            }
+        },
+        "tagIDs": {
+            "type": "array",
+            "description": "List of tags that files are associated with the project",
+            "items": {
+                "type": "string"
+            }
+        }
+     },
+    "required": ["projectId", "projectName", "projectManagerID", "dateCreated", "memberIDs"]
+}
