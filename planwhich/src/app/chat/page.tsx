@@ -5,28 +5,37 @@ import Navbar from "../components/Navbar";
 export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState("Planwhich");
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<{ from: string; text: string }[]>(
+    []
+  );
 
   const users = [
     {
       name: "Kaitlyn",
-      status: "Online Now",
-      color: "text-green-500",
+      status: "Online",
+      color: "bg-green-500",
       desc: "Yes",
     },
     {
       name: "Aaron",
       status: "Away",
-      color: "text-yellow-500",
+      color: "bg-yellow-500",
       desc: "Meeting at 7:00",
     },
-    { name: "Aarya", status: "Busy", color: "text-red-500", desc: "Backend" },
+    { name: "Aarya", status: "Busy", color: "bg-red-500", desc: "Backend" },
   ];
 
   const groups = [
     { name: "Planwhich", desc: "Build Night" },
     { name: "ACM", desc: "Meeting at 7:00" },
   ];
+
+  function initials(name: string) {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("");
+  }
 
   function sendMessage() {
     if (!input.trim()) return;
@@ -36,53 +45,60 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
-      {/* Navbar on top */}
-      <div className="shadow-md z-10">
-        <Navbar />
-      </div>
+      {/* Navbar */}
+      <Navbar />
 
-      {/* Main content below navbar */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-72 bg-white shadow-md p-4 flex flex-col overflow-y-auto">
-          <h2 className="text-xl font-semibold mb-4">Chat</h2>
+        {/* LEFT SIDEBAR */}
+        <div className="w-72 bg-white border-r shadow-sm p-4 flex flex-col overflow-y-auto">
+          <h2 className="text-xl font-semibold mb-4">Messages</h2>
 
-          {/* User list */}
-          <div className="space-y-2 mb-6">
+          <div className="space-y-3">
             {users.map((user) => (
               <div
                 key={user.name}
                 onClick={() => setSelectedChat(user.name)}
-                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 ${
-                  selectedChat === user.name ? "bg-gray-100" : ""
+                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition
+                ${
+                  selectedChat === user.name
+                    ? "bg-blue-50 border border-blue-200"
+                    : "hover:bg-gray-100"
                 }`}
               >
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-700 text-xl">
-                  👤
+                <div className="relative">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-semibold text-gray-700">
+                    {initials(user.name)}
+                  </div>
+                  <span
+                    className={`${user.color} w-3 h-3 rounded-full absolute bottom-0 right-0 border-2 border-white`}
+                  />
                 </div>
+
                 <div className="flex-1">
-                  <p className="font-medium">{user.name}</p>
+                  <p className="font-medium text-gray-800">{user.name}</p>
                   <p className="text-sm text-gray-500">{user.desc}</p>
                 </div>
-                <span className={`text-xs font-semibold ${user.color}`}>
-                  {user.status}
-                </span>
               </div>
             ))}
           </div>
 
-          {/* Group list */}
+          <hr className="my-5" />
+
           <h3 className="text-lg font-semibold mb-2">Groups</h3>
+
           <div className="space-y-2">
             {groups.map((group) => (
               <div
                 key={group.name}
                 onClick={() => setSelectedChat(group.name)}
-                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 ${
-                  selectedChat === group.name ? "bg-gray-100" : ""
+                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition
+                ${
+                  selectedChat === group.name
+                    ? "bg-blue-50 border border-blue-200"
+                    : "hover:bg-gray-100"
                 }`}
               >
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-700 text-xl">
+                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 text-xl">
                   👥
                 </div>
                 <div>
@@ -94,43 +110,39 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Chat area */}
-        <div className="flex-1 p-8 flex flex-col overflow-hidden">
-          <h2 className="text-xl font-semibold mb-2">To: {selectedChat}</h2>
+        {/* CHAT RIGHT SIDE */}
+        <div className="flex-1 flex flex-col p-6">
+          <h2 className="text-xl font-semibold mb-4">Chat — {selectedChat}</h2>
 
-          {/* Messages */}
-          <div className="flex-1 border rounded-lg p-4 bg-white overflow-y-auto mb-4">
+          <div className="flex-1 border rounded-lg bg-white p-4 overflow-y-auto space-y-4 shadow-sm">
             {messages.length === 0 ? (
-              <p className="text-gray-400 italic">Write Message here</p>
+              <p className="text-gray-400 text-center mt-10">No messages yet</p>
             ) : (
-              <div className="space-y-6">
-                {messages.map((msg, i) => (
-                  <div key={i} className="flex justify-end">
-                    <div className="bg-blue-500 text-white px-4 py-2 rounded-2xl max-w-xs">
-                      {msg.text}
-                    </div>
+              messages.map((msg, i) => (
+                <div key={i} className="flex justify-end">
+                  <div className="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-none max-w-sm leading-relaxed">
+                    {msg.text}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))
             )}
           </div>
 
-          {/* Input area */}
-          <div>
+          {/* INPUT BAR */}
+          <div className="mt-4 flex gap-3">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Write Message here"
-              className="w-full border rounded-md p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 h-32"
+              placeholder="Type a message..."
+              className="flex-1 border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400 h-24 resize-none"
             />
-            <div className="flex justify-center mt-3">
-              <button
-                onClick={sendMessage}
-                className="bg-[#324A6D] text-white px-8 py-2 rounded-md hover:bg-[#2B3F5C]"
-              >
-                Send
-              </button>
-            </div>
+
+            <button
+              onClick={sendMessage}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-md h-12 self-end"
+            >
+              Send
+            </button>
           </div>
         </div>
       </div>

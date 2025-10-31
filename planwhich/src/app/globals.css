@@ -1,4 +1,15 @@
-@import "tailwindcss";
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 @import "react-calendar/dist/Calendar.css";
 
+/* Use fonts loaded via next/font (variables are added to <body> in layout.tsx) */
+body {
+	font-family: var(--font-geist-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial);
+}
+
+code, pre, kbd, samp {
+	font-family: var(--font-geist-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Segoe UI Mono", "Oxygen Mono", monospace);
+}
