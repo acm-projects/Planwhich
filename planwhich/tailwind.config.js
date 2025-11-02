@@ -11,3 +11,4 @@ module.exports = {
   plugins: [],
   // Use Tailwind's preflight (base) styles to provide sensible defaults
 }
+
