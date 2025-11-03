@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 
 interface FormData {
   name: string;
@@ -24,9 +24,40 @@ export default function ProjectForm({
   onSubmit,
   onCancel
 }: ProjectFormProps) {
+  const [emailInput, setEmailInput] = useState('');
+  const [collaborators, setCollaborators] = useState<string[]>(formData.collaborators || []);
+
+  // --- Add collaborator on Enter ---
+  const handleAddCollaborator = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && emailInput.trim()) {
+      e.preventDefault();
+      const email = emailInput.trim();
+
+      if (!collaborators.includes(email)) {
+        const updated = [...collaborators, email];
+        setCollaborators(updated);
+      }
+
+      setEmailInput('');
+    }
+  };
+
+  // --- Remove collaborator when X is clicked ---
+  const handleRemoveCollaborator = (email: string) => {
+    const updated = collaborators.filter(c => c !== email);
+    setCollaborators(updated);
+  };
+
+  // --- Optionally sync collaborators with formData before submit ---
+  const handleSubmit = () => {
+    formData.collaborators = collaborators; // sync local state to formData before submit
+    onSubmit();
+  };
+
   return (
     <>
       <div className="space-y-4 mb-6">
+        {/* Project Name */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Project Name <span className="text-red-500">*</span>
@@ -42,6 +73,7 @@ export default function ProjectForm({
           />
         </div>
 
+        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Description <span className="text-red-500">*</span>
@@ -57,6 +89,7 @@ export default function ProjectForm({
           />
         </div>
 
+        {/* Project Picture */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Project Picture <span className="text-red-500">*</span>
@@ -83,18 +116,44 @@ export default function ProjectForm({
           )}
         </div>
 
+        {/* Collaborators */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Assign Collaborators
           </label>
           <input
-            type="text"
-            placeholder="Add team member names..."
+            type="email"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            onKeyDown={handleAddCollaborator}
+            placeholder="Add team member email and press Enter"
             className="w-full px-3 py-2 text-gray-800 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400"
           />
+
+          {/* List of collaborators */}
+          {collaborators.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {collaborators.map((email, index) => (
+                <span
+                  key={index}
+                  className="flex items-center bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm"
+                >
+                  {email}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCollaborator(email)}
+                    className="ml-2 text-green-600 hover:text-red-500 font-bold"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Buttons */}
       <div className="flex gap-3">
         <button
           onClick={onCancel}
@@ -103,7 +162,7 @@ export default function ProjectForm({
           Cancel
         </button>
         <button
-          onClick={onSubmit}
+          onClick={handleSubmit}
           className="flex-1 px-4 py-2 bg-green-400 text-white rounded-md hover:bg-green-500 transition font-medium"
         >
           Create
