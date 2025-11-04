@@ -12,7 +12,7 @@ const CalendarTasks: React.FC = () => {
   const weekDays = Array.from({ length: 7 }, (_, i) => startOfWeek.add(i, 'day'));
 
   return (
-    <div className="bg-white rounded-2xl shadow-md p-6 w-1/3 h-[66vh] flex flex-col">
+    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative w-[400px] h-[296px] overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">

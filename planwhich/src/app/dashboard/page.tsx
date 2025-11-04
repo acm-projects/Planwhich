@@ -8,28 +8,30 @@ import FileManager from '../components/FileManager';
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
+      
+      <div className="p-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Marketing Project</h1>
+        
+        <div className="flex gap-6 h-[calc(100vh-180px)]">
+          {/* Left Section - Task Status */}
+          <div className="flex-1 h-full">
+            <TaskStatusBoard />
+          </div>
 
-      <div className="flex flex-1 p-4 gap-4">
-        {/* Left Column - Task Status */}
-
-          <TaskStatusBoard />
-
-
-        {/* Middle + Right Columns */}
-        <div className="flex flex-col w-3/4 gap-4">
-          <div className="flex gap-4">
-            <div className="w-2/3">
+          {/* Middle Section - Calendar and Members */}
+          <div className="flex-1 flex flex-col gap-6 h-full">
+            <div className="flex-shrink-0">
               <CalendarTasks />
             </div>
-
-            <div className="w-1/3">
+            <div className="flex-1 min-h-0">
               <MemberList />
             </div>
           </div>
 
-          <div className="w-full">
+          {/* Right Section - My Files */}
+          <div className="flex-1 h-full">
             <FileManager />
           </div>
         </div>

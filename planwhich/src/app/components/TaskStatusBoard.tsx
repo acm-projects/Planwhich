@@ -56,7 +56,7 @@ const TaskBoardPopup: React.FC<TaskBoardPopupProps> = ({ tasks, onClose, onTaskC
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-full overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">Task Board</h2>
           <div className="flex items-center gap-3">
@@ -191,7 +191,7 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [] }) 
   });
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative w-1/3 max-w-md mx-4">
+    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative">
       <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center justify-between cursor-pointer" onClick={() => setShowBoard(true)}>
         Task Status
         <button onClick={(e) => { e.stopPropagation(); setShowForm(true); }} className="w-10 h-10 flex items-center justify-center bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition"><Plus size={20} /></button>
