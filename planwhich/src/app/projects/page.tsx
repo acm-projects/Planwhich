@@ -1,9 +1,9 @@
-'use client';
-import { useState, useEffect, useRef } from 'react';
+"use client";
+import { useState, useEffect, useRef } from "react";
 import NewProjectModal from "../components/NewProjectModal";
 import ProjectGrid from "../components/ProjectGrid";
-import Navbar from '../components/Navbar';
-import ToggleSwitch from '../components/ToggleSwitch';
+import Navbar from "../components/Navbar";
+import ToggleSwitch from "../components/ToggleSwitch";
 import { getGoogleCalendarAuthUrl } from '../utils/googleCalendar';
 
 const COGNITO_DOMAIN = "https://us-east-1mupktbr1j.auth.us-east-1.amazoncognito.com";
@@ -163,19 +163,19 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleCreateProject = (newProjectData: Omit<Project, 'id'>) => {
+  const handleCreateProject = (newProjectData: Omit<Project, "id">) => {
     const newProject: Project = {
       id: Date.now(),
       ...newProjectData,
-      isHidden: false
+      isHidden: false,
     };
-    setProjects(prev => [...prev, newProject]);
+    setProjects((prev) => [...prev, newProject]);
     setShowModal(false);
   };
 
   const toggleProjectVisibility = (projectId: number) => {
-    setProjects(prev =>
-      prev.map(project =>
+    setProjects((prev) =>
+      prev.map((project) =>
         project.id === projectId
           ? { ...project, isHidden: !project.isHidden }
           : project
@@ -186,13 +186,19 @@ export default function ProjectsPage() {
   const handleLogout = () => {
     localStorage.clear();
     sessionStorage.clear();
-    const logoutUrl = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(window.location.origin)}`;
+
+    // Redirect to Cognito logout endpoint
+    const logoutUrl =
+      `${COGNITO_DOMAIN}/logout?` +
+      `client_id=${CLIENT_ID}&` +
+      `logout_uri=${encodeURIComponent(window.location.origin)}`;
+
     window.location.href = logoutUrl;
   };
 
   const visibleProjects = showHiddenProjects
     ? projects
-    : projects.filter(project => !project.isHidden);
+    : projects.filter((project) => !project.isHidden);
 
   if (isLoading) {
     return (
@@ -213,6 +219,7 @@ export default function ProjectsPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-800">My Projects</h1>
+
             <div className="flex items-center gap-4">
               <ToggleSwitch
                 label="See Hidden Projects"
@@ -220,6 +227,8 @@ export default function ProjectsPage() {
                 onChange={setShowHiddenProjects}
                 size="md"
               />
+
+              {/* Sign Out Button */}
               <button
                 onClick={handleLogout}
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium"
@@ -228,6 +237,7 @@ export default function ProjectsPage() {
               </button>
             </div>
           </div>
+
           <ProjectGrid
             projects={visibleProjects}
             onCreateClick={() => setShowModal(true)}
