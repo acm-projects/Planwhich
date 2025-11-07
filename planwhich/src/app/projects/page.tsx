@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import NewProjectModal from "../components/NewProjectModal";
 import ProjectGrid from "../components/ProjectGrid";
 import Navbar from "../components/Navbar";
@@ -21,6 +22,7 @@ export interface Project {
 }
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showHiddenProjects, setShowHiddenProjects] = useState(false);
@@ -183,6 +185,11 @@ export default function ProjectsPage() {
     );
   };
 
+  const handleProjectClick = (projectId: number) => {
+    console.log('handleProjectClick called with', projectId);
+    router.push(`/dashboard?projectId=${projectId}`);
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     sessionStorage.clear();
@@ -242,6 +249,7 @@ export default function ProjectsPage() {
             projects={visibleProjects}
             onCreateClick={() => setShowModal(true)}
             onToggleVisibility={toggleProjectVisibility}
+            onProjectClick={handleProjectClick}
           />
         </div>
         <NewProjectModal
