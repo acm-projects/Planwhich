@@ -96,6 +96,12 @@ export default function TasksSidebarPage() {
             </div>
           )
         )}
+        <button
+          onClick={() => console.log("Saved", tasks)}
+          className="w-full p-2 bg-[#D3C2A5] rounded-xl text-[#2E2A24] font-semibold hover:bg-[#cbb899]"
+        >
+          Save
+        </button>
       </aside>
     </div>
   );
