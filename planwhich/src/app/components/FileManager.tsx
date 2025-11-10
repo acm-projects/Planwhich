@@ -23,13 +23,9 @@ interface FolderItem {
 
 export default function FileManager() {
   const [folders, setFolders] = useState<FolderItem[]>([
-    { id: 1, name: 'Previous Flyers', isOpen: false, files: [], sharedBy: 'user', date: '16/02/2021' },
-    { id: 2, name: 'Meeting Minutes', isOpen: false, files: [], sharedBy: 'user', date: '16/02/2021' },
   ]);
 
   const [rootFiles, setRootFiles] = useState<FileItem[]>([
-    { id: 1, name: "This Year's Budget", size: '2.4 KB', sharedBy: 'user ', date: '16/01/2021', type: 'document' },
-    { id: 2, name: 'Officer Photo', size: '156 KB', sharedBy: 'user', date: '16/02/2021', type: 'image' },
   ]);
 
   const [draggedFile, setDraggedFile] = useState<{ file: FileItem; fromFolderId: number | null } | null>(null);

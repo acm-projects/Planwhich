@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from "next/link"
 import { BsThreeDotsVertical } from 'react-icons/bs';
 import { Project } from '../projects/page';
 import ToggleSwitch from './ToggleSwitch';
@@ -13,7 +14,8 @@ export default function ProjectCard({ project, onToggleVisibility }: ProjectCard
   const [showMenu, setShowMenu] = useState(false);
 
   return (
-    <div className="w-96 h-80 bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition flex flex-col">
+    <Link href="/dashboard">
+      <div className="w-96 h-80 bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl hover:bg-gray-50 transition-all duration-200 flex flex-col cursor-pointer">
       {/* Header with Title and Three-Dot Menu */}
       <div className="h-20 p-4 flex items-center justify-between">
         <h3 className="font-semibold text-gray-800 line-clamp-2 flex-1">{project.name}</h3>
@@ -21,7 +23,11 @@ export default function ProjectCard({ project, onToggleVisibility }: ProjectCard
         {/* Three Dots Menu Button */}
         <div className="relative ml-2">
           <button
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowMenu(!showMenu);
+            }}
             className="p-2 hover:bg-gray-100 rounded-full transition"
             aria-label="Project menu"
           >
@@ -67,5 +73,6 @@ export default function ProjectCard({ project, onToggleVisibility }: ProjectCard
         )}
       </div>
     </div>
+    </Link>
   );
 }
