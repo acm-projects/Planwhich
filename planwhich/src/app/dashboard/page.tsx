@@ -174,7 +174,7 @@ export default function DashboardPage() {
           </div>
           {/* Right Section - My Files */}
           <div className="flex-1 h-full">
-            <FileManager />
+            <FileManager projectId={projectId} />
           </div>
         </div>
       </div>
