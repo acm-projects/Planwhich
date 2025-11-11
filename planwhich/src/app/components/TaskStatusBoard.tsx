@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, Plus, X, Calendar } from 'lucide-react';
 
 export type TaskStatusType = 'To-Do' | 'In Progress' | 'Complete';
@@ -13,7 +13,6 @@ export interface Task {
   dueDate: string;
 }
 
-// --- Inline Kanban / TaskBoardPopup ---
 interface TaskBoardPopupProps {
   tasks: Task[];
   onClose: () => void;
@@ -56,12 +55,10 @@ const TaskBoardPopup: React.FC<TaskBoardPopupProps> = ({ tasks, onClose, onTaskC
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 w-full max-w-5xl">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">Task Board</h2>
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">Close</button>
-          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">Close</button>
         </div>
 
         <div className="flex-1 overflow-auto p-6">
@@ -95,8 +92,9 @@ const TaskBoardPopup: React.FC<TaskBoardPopupProps> = ({ tasks, onClose, onTaskC
                         <Calendar size={14} />
                         <span className='mr-auto font-medium'>{task.dueDate}</span>
                         <div className="flex -space-x-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-500 border-2 border-white"></div>
-                          <div className="w-6 h-6 rounded-full bg-yellow-500 border-2 border-white"></div>
+                          {task.collaborators.split(',').map((c) => (
+                            <div key={c} className="w-6 h-6 rounded-full bg-green-500 border-2 border-white" title={c}></div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -115,7 +113,6 @@ const TaskBoardPopup: React.FC<TaskBoardPopupProps> = ({ tasks, onClose, onTaskC
   );
 };
 
-// --- Status Button ---
 interface StatusButtonProps {
   status: TaskStatusType;
   onClick: (newStatus: TaskStatusType) => void;
@@ -141,7 +138,13 @@ const StatusButton: React.FC<StatusButtonProps> = ({ status, onClick }) => {
       {showMenu && (
         <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[100px]">
           {(Object.keys(statusStyles) as TaskStatusType[]).map((option) => (
-            <button key={option} onClick={() => { onClick(option); setShowMenu(false); }} className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">{option}</button>
+            <button
+              key={option}
+              onClick={() => { onClick(option); setShowMenu(false); }}
+              className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              {option}
+            </button>
           ))}
         </div>
       )}
@@ -149,7 +152,6 @@ const StatusButton: React.FC<StatusButtonProps> = ({ status, onClick }) => {
   );
 };
 
-// --- Main Task Status Board Component ---
 interface TaskStatusBoardProps {
   initialTasks?: Task[];
   onCreateTask?: (taskData: {
@@ -169,10 +171,26 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
   const [isCreating, setIsCreating] = useState(false);
   const [newTask, setNewTask] = useState<Omit<Task, 'id'>>({ name: '', description: '', collaborators: '', status: 'To-Do', dueDate: '' });
 
-  // Update tasks when initialTasks prop changes
+  const [showCollaboratorsDropdown, setShowCollaboratorsDropdown] = useState(false);
+  const [collaboratorSearch, setCollaboratorSearch] = useState('');
+  const collaboratorsRef = useRef<HTMLDivElement>(null);
+
+  const projectMembers = ['member1', 'member2', 'member3', 'member4', 'member5'];
+  const filteredMembers = projectMembers.filter(
+    (m) =>
+      m.toLowerCase().includes(collaboratorSearch.toLowerCase()) &&
+      !(newTask.collaborators.split(',') || []).includes(m)
+  );
+
   useEffect(() => {
-    setTasks(initialTasks);
-  }, [initialTasks]);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (collaboratorsRef.current && !collaboratorsRef.current.contains(e.target as Node)) {
+        setShowCollaboratorsDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const formatDateForStorage = (dateString: string): string => {
     if (!dateString) return 'No date';
@@ -239,29 +257,141 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
   });
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative h-full flex flex-col">
-      <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center justify-between cursor-pointer" onClick={() => setShowBoard(true)}>
-        Task Status
-        <button onClick={(e) => { e.stopPropagation(); setShowForm(true); }} className="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition"><Plus size={20} /></button>
+    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative">
+      <h2 className="text-xl font-semibold text-gray-800 mb-1 flex items-center justify-between">
+        <span>Task Status</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowForm(true); }}
+          className="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition"
+        >
+          <Plus size={20} />
+        </button>
       </h2>
 
+      <div
+        onClick={() => setShowBoard(true)}
+        className="text-sm text-gray-500 hover:text-green-500 cursor-pointer mb-6 transition"
+      >
+        See Kanban Board
+      </div>
+
       {showBoard && (
-        <TaskBoardPopup tasks={tasks} onClose={() => setShowBoard(false)} onStatusChange={(taskId, newStatus) => handleStatusChange(taskId, newStatus)} onTaskClick={() => {}} />
+        <TaskBoardPopup
+          tasks={tasks}
+          onClose={() => setShowBoard(false)}
+          onStatusChange={(taskId, newStatus) => handleStatusChange(taskId, newStatus)}
+          onTaskClick={() => {}}
+        />
       )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative">
-            <button onClick={() => setShowForm(false)} className="absolute top-3 right-3 text-gray-500 hover:text-gray-700" disabled={isCreating}><X size={20} /></button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <X size={20} />
+            </button>
             <h3 className="text-lg font-semibold mb-4 text-center">Add New Task</h3>
-            <input type="text" placeholder="Task name" value={newTask.name} onChange={(e) => setNewTask({ ...newTask, name: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
-            <textarea placeholder="Description" value={newTask.description} onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
-            <input type="text" placeholder="Collaborators (comma-separated user IDs)" value={newTask.collaborators} onChange={(e) => setNewTask({ ...newTask, collaborators: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
-            <input type="date" value={newTask.dueDate} onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
+
+            <input
+              type="text"
+              placeholder="Task name"
+              value={newTask.name}
+              onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
+              className="w-full mb-3 p-2 border border-gray-300 rounded-lg focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none"
+            />
+
+            <textarea
+              placeholder="Description"
+              value={newTask.description}
+              onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+              className="w-full mb-3 p-2 border border-gray-300 rounded-lg focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none"
+            />
+
+            {/* Collaborators multi-select */}
+            <div className="relative mb-3" ref={collaboratorsRef}>
+              <div
+                className="w-full p-2 border border-gray-300 rounded-lg flex flex-wrap gap-1 items-center cursor-text focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500"
+                onClick={() => setShowCollaboratorsDropdown(true)}
+              >
+                {(newTask.collaborators
+                  ? newTask.collaborators.split(',')
+                  : []
+                ).map((c) => (
+                  <span
+                    key={c}
+                    className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs flex items-center gap-1"
+                  >
+                    {c}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const current = newTask.collaborators
+                          .split(',')
+                          .filter((col) => col !== c);
+                        setNewTask({ ...newTask, collaborators: current.join(',') });
+                      }}
+                      className="text-green-600 hover:text-green-800 ml-1 text-xs font-bold"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  value={collaboratorSearch}
+                  onChange={(e) => {
+                    setCollaboratorSearch(e.target.value);
+                    setShowCollaboratorsDropdown(true);
+                  }}
+                  className="flex-1 border-none outline-none text-sm p-1"
+                  placeholder="Select collaborators..."
+                />
+              </div>
+
+              {showCollaboratorsDropdown && filteredMembers.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-10 max-h-40 overflow-auto">
+                  {filteredMembers.map((member) => (
+                    <div
+                      key={member}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => {
+                        const current = newTask.collaborators
+                          ? newTask.collaborators.split(',')
+                          : [];
+                        setNewTask({ ...newTask, collaborators: [...current, member].join(',') });
+                        setCollaboratorSearch('');
+                      }}
+                    >
+                      {member}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <input
+              type="date"
+              value={newTask.dueDate}
+              onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+              className="w-full mb-3 p-2 border border-gray-300 rounded-lg focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none"
+            />
+
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" disabled={isCreating}>Cancel</button>
-              <button onClick={handleAddTask} className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'Save'}
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddTask}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+              >
+                Save
               </button>
             </div>
           </div>
@@ -270,7 +400,13 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
 
       <div className="relative mb-6">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-        <input type="text" placeholder="Search tasks..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-400 transition" />
+        <input
+          type="text"
+          placeholder="Search tasks..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
+        />
       </div>
 
       <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-4 mb-3 pb-2 border-b border-gray-200 text-sm font-medium text-gray-600">
