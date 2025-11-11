@@ -1,6 +1,6 @@
 'use client';
-import React, { useState } from 'react';
-import { Search, Plus, X, Calendar, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, X, Calendar } from 'lucide-react';
 
 export type TaskStatusType = 'To-Do' | 'In Progress' | 'Complete';
 
@@ -56,7 +56,7 @@ const TaskBoardPopup: React.FC<TaskBoardPopupProps> = ({ tasks, onClose, onTaskC
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">Task Board</h2>
           <div className="flex items-center gap-3">
@@ -152,14 +152,27 @@ const StatusButton: React.FC<StatusButtonProps> = ({ status, onClick }) => {
 // --- Main Task Status Board Component ---
 interface TaskStatusBoardProps {
   initialTasks?: Task[];
+  onCreateTask?: (taskData: {
+    taskName: string;
+    description: string;
+    assignedUserIDs: string[];
+    status: 'To Do' | 'In Progress' | 'Done';
+    dueDate?: string;
+  }) => Promise<any>;
 }
 
-const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [] }) => {
+const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], onCreateTask }) => {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showBoard, setShowBoard] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [newTask, setNewTask] = useState<Omit<Task, 'id'>>({ name: '', description: '', collaborators: '', status: 'To-Do', dueDate: '' });
+
+  // Update tasks when initialTasks prop changes
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
 
   const formatDateForStorage = (dateString: string): string => {
     if (!dateString) return 'No date';
@@ -170,13 +183,49 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [] }) 
     return `${mm}/${dd}/${yy}`;
   };
 
-  const handleAddTask = () => {
-    if (!newTask.name.trim()) return;
-    const formattedDate = formatDateForStorage(newTask.dueDate);
-    const task: Task = { id: Date.now(), ...newTask, dueDate: formattedDate };
-    setTasks((prev) => [...prev, task]);
-    setShowForm(false);
-    setNewTask({ name: '', description: '', collaborators: '', status: 'To-Do', dueDate: '' });
+  const handleAddTask = async () => {
+    console.log('🎯 handleAddTask called with:', newTask);
+    
+    if (!newTask.name.trim()) {
+      alert('Please enter a task name');
+      return;
+    }
+    
+    setIsCreating(true);
+    
+    try {
+      const formattedDate = formatDateForStorage(newTask.dueDate);
+      
+      console.log('🎯 About to call onCreateTask, exists?', !!onCreateTask);
+      
+      // If onCreateTask callback is provided, use it (API call)
+      if (onCreateTask) {
+        console.log('🎯 Calling onCreateTask...');
+        // Convert status format
+        const apiStatus = newTask.status === 'To-Do' ? 'To Do' : 
+                         newTask.status === 'In Progress' ? 'In Progress' : 'Done';
+        
+        await onCreateTask({
+          taskName: newTask.name,
+          description: newTask.description,
+          assignedUserIDs: newTask.collaborators ? newTask.collaborators.split(',').map(id => id.trim()) : [],
+          status: apiStatus,
+          dueDate: newTask.dueDate || undefined
+        });
+      } else {
+        // Fallback to local state only
+        const task: Task = { id: Date.now(), ...newTask, dueDate: formattedDate };
+        setTasks((prev) => [...prev, task]);
+      }
+      
+      setShowForm(false);
+      setNewTask({ name: '', description: '', collaborators: '', status: 'To-Do', dueDate: '' });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      // Error is already handled in parent component
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleStatusChange = (id: number, newStatus: TaskStatusType) => {
@@ -190,7 +239,7 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [] }) 
   });
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative">
+    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative h-full flex flex-col">
       <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center justify-between cursor-pointer" onClick={() => setShowBoard(true)}>
         Task Status
         <button onClick={(e) => { e.stopPropagation(); setShowForm(true); }} className="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition"><Plus size={20} /></button>
@@ -203,15 +252,17 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [] }) 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative">
-            <button onClick={() => setShowForm(false)} className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"><X size={20} /></button>
+            <button onClick={() => setShowForm(false)} className="absolute top-3 right-3 text-gray-500 hover:text-gray-700" disabled={isCreating}><X size={20} /></button>
             <h3 className="text-lg font-semibold mb-4 text-center">Add New Task</h3>
-            <input type="text" placeholder="Task name" value={newTask.name} onChange={(e) => setNewTask({ ...newTask, name: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" />
-            <textarea placeholder="Description" value={newTask.description} onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" />
-            <input type="text" placeholder="Collaborators" value={newTask.collaborators} onChange={(e) => setNewTask({ ...newTask, collaborators: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" />
-            <input type="date" value={newTask.dueDate} onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" />
+            <input type="text" placeholder="Task name" value={newTask.name} onChange={(e) => setNewTask({ ...newTask, name: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
+            <textarea placeholder="Description" value={newTask.description} onChange={(e) => setNewTask({ ...newTask, description: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
+            <input type="text" placeholder="Collaborators (comma-separated user IDs)" value={newTask.collaborators} onChange={(e) => setNewTask({ ...newTask, collaborators: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
+            <input type="date" value={newTask.dueDate} onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })} className="w-full mb-3 p-2 border border-gray-300 rounded-lg" disabled={isCreating} />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
-              <button onClick={handleAddTask} className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Save</button>
+              <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300" disabled={isCreating}>Cancel</button>
+              <button onClick={handleAddTask} className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={isCreating}>
+                {isCreating ? 'Creating...' : 'Save'}
+              </button>
             </div>
           </div>
         </div>
@@ -228,9 +279,9 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [] }) 
         <div className="text-right">Due Date</div>
       </div>
 
-      <div className="space-y-3 h-96 overflow-y-auto pr-2">
+      <div className="flex-1 space-y-3 overflow-y-auto pr-2">
         {sortedTasks.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">{searchQuery ? 'No tasks found matching your search.' : 'No tasks yet.'}</div>
+          <div className="text-center text-gray-500 py-8">{searchQuery ? 'No tasks found matching your search.' : 'No tasks yet. Click + to add a task.'}</div>
         ) : (
           sortedTasks.map((task) => (
             <div key={task.id} className="grid grid-cols-[1.5fr_1fr_1fr] gap-4 items-center py-2 px-1 hover:bg-green-50 rounded-lg cursor-pointer transition">

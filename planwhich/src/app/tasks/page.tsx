@@ -3,11 +3,11 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 
-const ReactSelect = dynamic(() => import("react-select"), { ssr: false });
+const ReactSelect: any = dynamic(() => import("react-select").then((mod) => mod.default as any), { ssr: false });
 
 const meetingParagraph = `During this morning’s product sync, Aaron began by reviewing last week’s progress on the mobile app. She mentioned that we still need to finalize the UI mockups before handing things off to development. Rishi added that user-data syncing has improved after the recent fix, but he still needs to prepare a short performance summary for the leadership team. Aarya brought up issues with customer onboarding and suggested updating the tutorial screens. She agreed to create a list of improvements to the onboarding flow. Kaitlyn said he would follow up with marketing to see whether they planned to highlight the new feature in this month’s newsletter. Toward the end, Aaron reminded everyone that someone must schedule a call with the design contractor to discuss icon replacements. The meeting wrapped up with Jonathan offering to send a brief summary of action items.`;
 
-const extractedTasks = [
+const extractedTasks: { id: number; text: string; assignedTo: string[] }[] = [
   { id: 1, text: "Finalize UI mockups", assignedTo: [] },
   { id: 2, text: "Prepare performance summary", assignedTo: [] },
   { id: 3, text: "List improvements to onboarding", assignedTo: [] },
@@ -30,7 +30,7 @@ export default function TasksSidebarPage() {
     new Set([...presetPeople, ...tasks.flatMap((t) => t.assignedTo || [])])
   );
 
-  function assignPerson(taskId, peopleSelected) {
+  function assignPerson(taskId: number, peopleSelected: string[]) {
     setTasks((prev) =>
       prev.map((task) =>
         task.id === taskId ? { ...task, assignedTo: peopleSelected } : task
@@ -38,7 +38,7 @@ export default function TasksSidebarPage() {
     );
   }
 
-  const grouped = tasks.reduce((acc, task) => {
+  const grouped = tasks.reduce<Record<string, typeof tasks[number][]>>((acc, task) => {
     if (!task.assignedTo || task.assignedTo.length === 0) {
       acc["Unassigned"] = acc["Unassigned"] || [];
       acc["Unassigned"].push(task);
@@ -84,7 +84,7 @@ export default function TasksSidebarPage() {
                 isMulti
                 options={people.map((p) => ({ value: p, label: p }))}
                 value={task.assignedTo?.map((p) => ({ value: p, label: p }))}
-                onChange={(selected) =>
+                onChange={(selected: { value: string; label: string }[] | null) =>
                   assignPerson(
                     task.id,
                     selected ? selected.map((opt) => opt.value) : []

@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import Link from "next/link"
 import { BsThreeDotsVertical } from 'react-icons/bs';
 import { Project } from '../projects/page';
 import ToggleSwitch from './ToggleSwitch';
@@ -8,14 +7,20 @@ import ToggleSwitch from './ToggleSwitch';
 interface ProjectCardProps {
   project: Project;
   onToggleVisibility?: (projectId: number) => void;
+  onClick?: (projectId: number) => void;
 }
 
-export default function ProjectCard({ project, onToggleVisibility }: ProjectCardProps) {
+export default function ProjectCard({ project, onToggleVisibility, onClick }: ProjectCardProps) {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
-    <Link href="/dashboard">
-      <div className="w-96 h-80 bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl hover:bg-gray-50 transition-all duration-200 flex flex-col cursor-pointer">
+    <div 
+      onClick={() => {
+        console.log('ProjectCard clicked', project.id);
+        onClick?.(project.id);
+      }}
+      className="w-96 h-80 bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl hover:bg-gray-50 transition-all duration-200 flex flex-col cursor-pointer"
+    >
       {/* Header with Title and Three-Dot Menu */}
       <div className="h-20 p-4 flex items-center justify-between">
         <h3 className="font-semibold text-gray-800 line-clamp-2 flex-1">{project.name}</h3>
@@ -33,7 +38,7 @@ export default function ProjectCard({ project, onToggleVisibility }: ProjectCard
           >
             <BsThreeDotsVertical className="text-gray-600 text-xl" />
           </button>
-          
+
           {/* Dropdown Menu */}
           {showMenu && (
             <>
@@ -63,7 +68,7 @@ export default function ProjectCard({ project, onToggleVisibility }: ProjectCard
           )}
         </div>
       </div>
-      
+
       {/* Project Image/Content Area */}
       <div className="bg-gradient-to-br from-blue-100 to-purple-100 flex-1 flex items-center justify-center text-6xl overflow-hidden">
         {typeof project.image === 'string' && project.image.startsWith('data:') ? (
@@ -73,6 +78,5 @@ export default function ProjectCard({ project, onToggleVisibility }: ProjectCard
         )}
       </div>
     </div>
-    </Link>
   );
 }
