@@ -153,6 +153,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+<<<<<<< HEAD
       <div className="p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Marketing Project</h1>
         <div className="flex gap-6 h-[calc(100vh-180px)]">
@@ -162,9 +163,20 @@ export default function DashboardPage() {
               initialTasks={convertToStatusBoardTasks(tasks)}
               onCreateTask={createTask}
             />
+=======
+
+      <div className="p-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Placeholder Name</h1>
+
+        {/* Main layout grid for equal spacing */}
+        <div className="grid grid-cols-3 gap-24 h-[calc(100vh-180px)]">
+          {/* Left Section - Task Status */}
+          <div className="flex flex-col min-h-[400px]">
+            <TaskStatusBoard />
+>>>>>>> a7f15a18531d221423d4bc87f917068098ad5b03
           </div>
           {/* Middle Section - Calendar and Members */}
-          <div className="flex-1 flex flex-col gap-6 h-full">
+          <div className="flex flex-col gap-6 min-h-[400px]">
             <div className="flex-shrink-0">
               <CalendarTasks />
             </div>
@@ -173,8 +185,13 @@ export default function DashboardPage() {
             </div>
           </div>
           {/* Right Section - My Files */}
+<<<<<<< HEAD
           <div className="flex-1 h-full">
             <FileManager projectId={projectId} />
+=======
+          <div className="flex flex-col min-h-[400px]">
+            <FileManager />
+>>>>>>> a7f15a18531d221423d4bc87f917068098ad5b03
           </div>
         </div>
       </div>

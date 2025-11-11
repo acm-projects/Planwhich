@@ -12,7 +12,6 @@ type RoleType = 'Manager' | 'Member';
 
 const MemberList: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
-
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -64,32 +63,35 @@ const MemberList: React.FC = () => {
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative w-[400px] h-[296px] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">Members</h2>
-          <button 
-            className="p-1.5 bg-green-500 hover:bg-green-600 rounded-md transition-colors" 
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus className="w-5 h-5 text-white" />
-          </button>
+      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative w-[400px] h-[288px] flex flex-col">
+        {/* Header & Search (fixed area) */}
+        <div className="flex-shrink-0">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Members</h2>
+            <button 
+              className="p-1.5 bg-green-500 hover:bg-green-600 rounded-md transition-colors" 
+              onClick={() => setShowAddModal(true)}
+            >
+              <Plus className="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-4 flex-shrink-0">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        {/* Members List */}
-        <div className="space-y-1 overflow-y-auto" style={{ maxHeight: '320px', minHeight: '320px' }}>
+        {/* Scrollable Members List */}
+        <div className="flex-1 overflow-y-auto space-y-1">
           {filteredMembers.map((member) => (
             <div
               key={member.id}
@@ -131,11 +133,6 @@ const MemberList: React.FC = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Right Side: Chat Icon */}
-              <button className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded-md transition-all">
-                <MessageCircle className="w-4 h-4 text-gray-400" />
-              </button>
             </div>
           ))}
 
@@ -148,7 +145,7 @@ const MemberList: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Member Modal */}
+      {/* Add Member Modal (unchanged) */}
       {showAddModal && (
         <div className="fixed inset-0 bg-grey bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-96">

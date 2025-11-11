@@ -230,7 +230,6 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
 
   const handleStatusChange = (id: number, newStatus: TaskStatusType) => {
     setTasks((prev) => prev.map((task) => (task.id === id ? { ...task, status: newStatus } : task)));
-    setShowBoard(true);
   };
 
   const filteredTasks = tasks.filter((task) => task.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -243,7 +242,7 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
     <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100 relative h-full flex flex-col">
       <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center justify-between cursor-pointer" onClick={() => setShowBoard(true)}>
         Task Status
-        <button onClick={(e) => { e.stopPropagation(); setShowForm(true); }} className="w-10 h-10 flex items-center justify-center bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition"><Plus size={20} /></button>
+        <button onClick={(e) => { e.stopPropagation(); setShowForm(true); }} className="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition"><Plus size={20} /></button>
       </h2>
 
       {showBoard && (
@@ -276,7 +275,7 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
 
       <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-4 mb-3 pb-2 border-b border-gray-200 text-sm font-medium text-gray-600">
         <div>Task</div>
-        <div className="text-center">Status</div>
+        <div className="text-center pr-4">Status</div>
         <div className="text-right">Due Date</div>
       </div>
 

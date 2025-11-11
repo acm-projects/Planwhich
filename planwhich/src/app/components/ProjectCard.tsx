@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from "next/link"
 import { BsThreeDotsVertical } from 'react-icons/bs';
 import { Project } from '../projects/page';
 import ToggleSwitch from './ToggleSwitch';
@@ -14,6 +15,7 @@ export default function ProjectCard({ project, onToggleVisibility, onClick }: Pr
   const [showMenu, setShowMenu] = useState(false);
 
   return (
+<<<<<<< HEAD
     <div
       onClick={() => {
         console.log('ProjectCard clicked', project.id);
@@ -21,6 +23,10 @@ export default function ProjectCard({ project, onToggleVisibility, onClick }: Pr
       }}
       className="w-96 h-80 bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition flex flex-col cursor-pointer"
     >
+=======
+    <Link href="/dashboard">
+      <div className="w-96 h-80 bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl hover:bg-gray-50 transition-all duration-200 flex flex-col cursor-pointer">
+>>>>>>> a7f15a18531d221423d4bc87f917068098ad5b03
       {/* Header with Title and Three-Dot Menu */}
       <div className="h-20 p-4 flex items-center justify-between">
         <h3 className="font-semibold text-gray-800 line-clamp-2 flex-1">{project.name}</h3>
@@ -29,6 +35,10 @@ export default function ProjectCard({ project, onToggleVisibility, onClick }: Pr
         <div className="relative ml-2">
           <button
             onClick={(e) => {
+<<<<<<< HEAD
+=======
+              e.preventDefault();
+>>>>>>> a7f15a18531d221423d4bc87f917068098ad5b03
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
@@ -77,5 +87,6 @@ export default function ProjectCard({ project, onToggleVisibility, onClick }: Pr
         )}
       </div>
     </div>
+    </Link>
   );
 }
