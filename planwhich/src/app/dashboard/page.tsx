@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import TaskStatusBoard from '../components/TaskStatusBoard';
@@ -35,6 +35,14 @@ export default function DashboardPage() {
   const projectId = searchParams.get('projectId');
   
   const [tasks, setTasks] = useState<Task[]>([]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Dashboard mounted');
+    console.log('🔍 projectId from URL:', projectId);
+    console.log('🔍 Full URL:', window.location.href);
+    console.log('🔍 All search params:', Object.fromEntries(searchParams.entries()));
+  }, [projectId, searchParams]);
 
   console.log('🎨 DashboardPage rendered, projectId:', projectId, 'tasks:', tasks.length);
 
@@ -145,7 +153,16 @@ export default function DashboardPage() {
   if (!projectId) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-xl text-gray-600">No project selected</p>
+        <div className="text-center">
+          <p className="text-xl text-gray-600 mb-4">No project selected</p>
+          <p className="text-sm text-gray-400">Current URL: {window.location.href}</p>
+          <button 
+            onClick={() => window.location.href = '/projects'} 
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Back to Projects
+          </button>
+        </div>
       </div>
     );
   }
@@ -153,18 +170,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-<<<<<<< HEAD
-      <div className="p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Marketing Project</h1>
-        <div className="flex gap-6 h-[calc(100vh-180px)]">
-          {/* Left Section - Task Status */}
-          <div className="flex-1 h-full">
-            <TaskStatusBoard 
-              initialTasks={convertToStatusBoardTasks(tasks)}
-              onCreateTask={createTask}
-            />
-=======
-
       <div className="p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Placeholder Name</h1>
 
@@ -172,8 +177,10 @@ export default function DashboardPage() {
         <div className="grid grid-cols-3 gap-24 h-[calc(100vh-180px)]">
           {/* Left Section - Task Status */}
           <div className="flex flex-col min-h-[400px]">
-            <TaskStatusBoard />
->>>>>>> a7f15a18531d221423d4bc87f917068098ad5b03
+            <TaskStatusBoard 
+              initialTasks={convertToStatusBoardTasks(tasks)}
+              onCreateTask={createTask}
+            />
           </div>
           {/* Middle Section - Calendar and Members */}
           <div className="flex flex-col gap-6 min-h-[400px]">
@@ -185,13 +192,8 @@ export default function DashboardPage() {
             </div>
           </div>
           {/* Right Section - My Files */}
-<<<<<<< HEAD
-          <div className="flex-1 h-full">
-            <FileManager projectId={projectId} />
-=======
           <div className="flex flex-col min-h-[400px]">
-            <FileManager />
->>>>>>> a7f15a18531d221423d4bc87f917068098ad5b03
+            <FileManager projectId={projectId} />
           </div>
         </div>
       </div>
