@@ -11,7 +11,7 @@ interface FileItem {
   sharedBy: string;
   date: string;
   type: 'document' | 'image';
-  fileID?: string; // API identifier
+  tags?: string[];
 }
 
 interface FolderItem {
@@ -23,23 +23,22 @@ interface FolderItem {
   date: string;
 }
 
-interface FileManagerProps {
-  projectId: string;
-}
-
-export default function FileManager({ projectId }: FileManagerProps) {
-  const [folders, setFolders] = useState<FolderItem[]>([
-  ]);
-
-  const [rootFiles, setRootFiles] = useState<FileItem[]>([
-  ]);
-
+export default function FileManager() {
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [rootFiles, setRootFiles] = useState<FileItem[]>([]);
   const [draggedFile, setDraggedFile] = useState<{ file: FileItem; fromFolderId: number | null } | null>(null);
+
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // File upload + tag states
+  const [showTagSelector, setShowTagSelector] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const genericTags = ['Important', 'Personal', 'Work', 'Urgent', 'Archive'];
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +47,7 @@ export default function FileManager({ projectId }: FileManagerProps) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowAddMenu(false);
         setShowNewFolderInput(false);
+        setShowTagSelector(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -62,102 +62,25 @@ export default function FileManager({ projectId }: FileManagerProps) {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+    setUploadingFiles(files);
+    setSelectedTags([]);
+    setShowTagSelector(true);
+  };
 
-    setIsUploading(true);
-
-    try {
-      const idToken = localStorage.getItem('idToken');
-      const userId = localStorage.getItem('userId');
-
-      if (!idToken) {
-        alert('Please log in again');
-        setIsUploading(false);
-        return;
-      }
-
-      if (!userId) {
-        alert('User ID not found');
-        setIsUploading(false);
-        return;
-      }
-
-      // Upload each file to the API
-      for (const file of files) {
-        console.log('📁 Uploading file:', file.name, 'Size:', file.size);
-
-        // Read file as base64
-        const base64File = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            // Remove the data URL prefix (e.g., "data:image/png;base64,")
-            const base64 = result.split(',')[1];
-            resolve(base64);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-
-        const fileID = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-        // Request body matching your Lambda's requirements
-        const requestBody = {
-          fileID: fileID,
-          fileName: file.name,
-          fileContent: base64File,
-          contentType: file.type || 'application/octet-stream',
-          uploaderID: userId,
-          projectID: projectId
-        };
-
-        console.log('📤 Sending file to API:', {
-          fileID,
-          fileName: file.name,
-          fileSize: file.size,
-          contentType: file.type,
-          projectID: projectId
-        });
-
-        const response = await fetch(FILES_API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('❌ File upload failed:', errorData);
-          throw new Error(errorData.error || 'Failed to upload file');
-        }
-
-        const data = await response.json();
-        console.log('✅ File uploaded successfully:', data);
-
-        // Add to local state
-        const newFile: FileItem = {
-          id: Date.now(),
-          name: file.name,
-          size: formatFileSize(file.size),
-          sharedBy: 'You',
-          date: new Date().toLocaleDateString('en-GB'),
-          type: file.type.startsWith('image/') ? 'image' : 'document',
-          fileID: fileID
-        };
-
-        setRootFiles((prev) => [...prev, newFile]);
-      }
-
-      console.log('✅ All files uploaded successfully');
-    } catch (error) {
-      console.error('💥 Error uploading file:', error);
-      alert('Failed to upload file. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
+  const confirmFileUpload = () => {
+    const newFiles: FileItem[] = uploadingFiles.map((file, index) => ({
+      id: Date.now() + index,
+      name: file.name,
+      size: formatFileSize(file.size),
+      sharedBy: 'You',
+      date: new Date().toLocaleDateString('en-GB'),
+      type: file.type.startsWith('image/') ? 'image' : 'document',
+      tags: selectedTags,
+    }));
+    setRootFiles((prev) => [...prev, ...newFiles]);
+    setShowTagSelector(false);
+    setUploadingFiles([]);
+    setSelectedTags([]);
   };
 
   const createFolder = () => {
@@ -296,15 +219,13 @@ export default function FileManager({ projectId }: FileManagerProps) {
     file.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col min-h-[600px]">
       {/* Header */}
-      <div className="p-6 border-b border-gray-100" ref={menuRef}>
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">My Files</h1>
+      <div className="px-6 pt-6 pb-4 border-b border-gray-100" ref={menuRef}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">My Files</h2>
           <div className="flex items-center gap-3">
-            {/* Search */}
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
               <input
@@ -312,27 +233,23 @@ export default function FileManager({ projectId }: FileManagerProps) {
                 placeholder="Search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
 
-            {/* Add Menu */}
             <div className="relative">
               <button
                 onClick={() => setShowAddMenu(!showAddMenu)}
-                disabled={isUploading}
-                className="w-8 h-8 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center disabled:bg-gray-400"
+                className="p-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center"
               >
                 <Plus className="w-4 h-4" />
               </button>
 
               {showAddMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10">
-                  <label className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors">
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10">
+                  <label className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors text-sm">
                     <Upload className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm text-gray-700">
-                      {isUploading ? 'Uploading...' : 'Upload Files'}
-                    </span>
+                    Upload Files
                     <input
                       type="file"
                       multiple
@@ -341,7 +258,6 @@ export default function FileManager({ projectId }: FileManagerProps) {
                         setShowAddMenu(false);
                       }}
                       className="hidden"
-                      disabled={isUploading}
                     />
                   </label>
                   <button
@@ -349,10 +265,10 @@ export default function FileManager({ projectId }: FileManagerProps) {
                       setShowNewFolderInput(true);
                       setShowAddMenu(false);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-left text-sm"
                   >
                     <Folder className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm text-gray-700">New Folder</span>
+                    New Folder
                   </button>
                 </div>
               )}
@@ -362,19 +278,19 @@ export default function FileManager({ projectId }: FileManagerProps) {
 
         {/* New Folder Input */}
         {showNewFolderInput && (
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mt-3">
             <input
               type="text"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && createFolder()}
               placeholder="Folder name"
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               autoFocus
             />
             <button
               onClick={createFolder}
-              className="px-4 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-colors"
+              className="px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
             >
               Create
             </button>
@@ -383,24 +299,77 @@ export default function FileManager({ projectId }: FileManagerProps) {
                 setShowNewFolderInput(false);
                 setNewFolderName('');
               }}
-              className="px-4 py-2 bg-gray-100 text-gray-600 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+              className="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-md hover:bg-gray-200 transition-colors"
             >
               Cancel
             </button>
           </div>
         )}
 
-        {/* Upload Status */}
-        {isUploading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-700">Uploading file(s) to server...</p>
+        {/* Tag selector for new uploads */}
+        {showTagSelector && (
+          <div className="relative flex gap-2 mt-3">
+            <div className="flex-1 relative">
+              <button
+                type="button"
+                className="w-full text-left px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex flex-wrap gap-1 items-center"
+              >
+                {selectedTags.length === 0 ? (
+                  <span className="text-gray-400 text-sm">Select tags...</span>
+                ) : (
+                  selectedTags.map((tag) => (
+                    <span key={tag} className="bg-green-200 text-green-800 px-2 py-0.5 rounded-full text-xs">
+                      {tag}
+                    </span>
+                  ))
+                )}
+              </button>
+
+              <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-10 max-h-40 overflow-auto">
+                {genericTags.map((tag) => (
+                  <div key={tag}>
+                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedTags.includes(tag)}
+                        onChange={() => {
+                          if (selectedTags.includes(tag)) {
+                            setSelectedTags(selectedTags.filter((t) => t !== tag));
+                          } else {
+                            setSelectedTags([...selectedTags, tag]);
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-gray-700">{tag}</span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={confirmFileUpload}
+              className="px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
+            >
+              Upload
+            </button>
+            <button
+              onClick={() => {
+                setShowTagSelector(false);
+                setUploadingFiles([]);
+                setSelectedTags([]);
+              }}
+              className="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-md hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         )}
       </div>
 
-      {/* File List */}
-      <div className="p-6 overflow-auto flex-1">
-        <div className="grid grid-cols-3 gap-4 pb-3 border-b border-gray-100 mb-2">
+      {/* Scrollable file list */}
+      <div className="px-6 pb-6 overflow-y-auto">
+        <div className="grid grid-cols-3 gap-4 pb-3 py-4 border-b border-gray-100 mb-2">
           <div className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
             Name <span className="text-gray-400">↑</span>
           </div>
@@ -409,6 +378,7 @@ export default function FileManager({ projectId }: FileManagerProps) {
         </div>
 
         <div className="space-y-1">
+          {/* Folders */}
           {filteredFolders.map((folder) => (
             <div key={folder.id}>
               <div
@@ -417,15 +387,10 @@ export default function FileManager({ projectId }: FileManagerProps) {
                 onDrop={() => handleDrop(folder.id)}
               >
                 <div className="flex items-center gap-3" onClick={() => toggleFolder(folder.id)}>
-                  <div className="w-5 h-5 bg-yellow-400 rounded flex items-center justify-center">
-                    📁
-                  </div>
-                  <span className="text-sm text-gray-900 font-medium">{folder.name}</span>
+                  <div className="w-5 h-5 bg-yellow-400 rounded flex items-center justify-center">📁</div>
+                  <span className="text-sm text-gray-900 font-medium truncate">{folder.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gray-300 rounded-full"></div>
-                  <span className="text-sm text-gray-600">{folder.sharedBy}</span>
-                </div>
+                <span className="text-sm text-gray-600">{folder.sharedBy}</span>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">{folder.date}</span>
                   <button
@@ -440,6 +405,7 @@ export default function FileManager({ projectId }: FileManagerProps) {
                 </div>
               </div>
 
+              {/* Files inside folder */}
               {folder.isOpen && folder.files.length > 0 && (
                 <div className="space-y-1 mt-1">
                   {folder.files.map((file) => (
@@ -447,16 +413,24 @@ export default function FileManager({ projectId }: FileManagerProps) {
                       key={file.id}
                       draggable
                       onDragStart={() => handleDragStart(file, folder.id)}
-                      className="grid grid-cols-3 gap-4 items-center p-3 hover:bg-gray-50 rounded-lg cursor-move group"
+                      className="grid grid-cols-3 gap-4 items-start p-3 hover:bg-gray-50 rounded-lg cursor-move group"
                     >
-                      <div className="flex items-center gap-3 pl-8">
-                        {getFileIcon(file.type)}
-                        <span className="text-sm text-gray-900">{file.name}</span>
+                      <div className="flex flex-col gap-1 pl-8">
+                        <div className="flex items-center gap-3">
+                          {getFileIcon(file.type)}
+                          <span className="text-sm text-gray-900 truncate">{file.name}</span>
+                        </div>
+                        {file.tags && file.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {file.tags.map((tag) => (
+                              <span key={tag} className="bg-green-200 text-green-800 px-2 py-0.5 rounded-full text-xs">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-gray-300 rounded-full"></div>
-                        <span className="text-sm text-gray-600">{file.sharedBy}</span>
-                      </div>
+                      <span className="text-sm text-gray-600">{file.sharedBy}</span>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">{file.date}</span>
                         <button
@@ -473,21 +447,30 @@ export default function FileManager({ projectId }: FileManagerProps) {
             </div>
           ))}
 
+          {/* Root files */}
           {filteredFiles.map((file) => (
             <div
               key={file.id}
               draggable
               onDragStart={() => handleDragStart(file)}
-              className="grid grid-cols-3 gap-4 items-center p-3 hover:bg-gray-50 rounded-lg cursor-move group"
+              className="grid grid-cols-3 gap-4 items-start p-3 hover:bg-gray-50 rounded-lg cursor-move group"
             >
-              <div className="flex items-center gap-3">
-                {getFileIcon(file.type)}
-                <span className="text-sm text-gray-900">{file.name}</span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3">
+                  {getFileIcon(file.type)}
+                  <span className="text-sm text-gray-900">{file.name}</span>
+                </div>
+                {file.tags && file.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {file.tags.map((tag) => (
+                      <span key={tag} className="bg-green-200 text-green-800 px-2 py-0.5 rounded-full text-xs">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-gray-300 rounded-full"></div>
-                <span className="text-sm text-gray-600">{file.sharedBy}</span>
-              </div>
+              <span className="text-sm text-gray-600">{file.sharedBy}</span>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">{file.date}</span>
                 <button
@@ -499,6 +482,10 @@ export default function FileManager({ projectId }: FileManagerProps) {
               </div>
             </div>
           ))}
+
+          {filteredFolders.length === 0 && filteredFiles.length === 0 && (
+            <p className="text-gray-500 text-sm text-center mt-4">No files found.</p>
+          )}
         </div>
       </div>
     </div>

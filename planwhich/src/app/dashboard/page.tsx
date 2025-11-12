@@ -1,4 +1,6 @@
 'use client';
+
+import React from 'react';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Navbar from '../components/Navbar';
@@ -186,20 +188,18 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-6">
       <Navbar />
       <div className="p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Placeholder Name</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">Placeholder Name</h1>
 
         {/* Main layout grid for equal spacing */}
         <div className="grid grid-cols-3 gap-24 h-[calc(100vh-180px)]">
           {/* Left Section - Task Status */}
           <div className="flex flex-col min-h-[400px]">
-            <TaskStatusBoard 
-              initialTasks={convertToStatusBoardTasks(tasks)}
-              onCreateTask={createTask}
-            />
+            <TaskStatusBoard />
           </div>
+
           {/* Middle Section - Calendar and Members */}
           <div className="flex flex-col gap-6 min-h-[400px]">
             <div className="flex-shrink-0">
@@ -209,9 +209,10 @@ export default function DashboardPage() {
               <MemberList />
             </div>
           </div>
+
           {/* Right Section - My Files */}
           <div className="flex flex-col min-h-[400px]">
-            <FileManager projectId={projectId} />
+            <FileManager />
           </div>
         </div>
       </div>
