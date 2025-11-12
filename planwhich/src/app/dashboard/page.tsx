@@ -78,18 +78,36 @@ export default function DashboardPage() {
         return;
       }
 
-      console.log('✅ Auth token found, userId:', userId);
+      if (!userId) {
+        console.error('❌ No userId found in localStorage');
+        alert('Session error. Please log in again.');
+        return;
+      }
+
+      console.log('✅ Auth token found');
+      console.log('✅ Current userId:', userId);
+      console.log('✅ Incoming assignedUserIDs:', taskData.assignedUserIDs);
 
       // Generate unique taskID and current timestamp
       const taskID = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const dateCreated = new Date().toISOString();
+
+      // Determine which user IDs to use
+      let finalAssignedUserIDs: string[];
+      if (taskData.assignedUserIDs && taskData.assignedUserIDs.length > 0) {
+        finalAssignedUserIDs = taskData.assignedUserIDs;
+        console.log('✅ Using provided assignedUserIDs:', finalAssignedUserIDs);
+      } else {
+        finalAssignedUserIDs = [userId];
+        console.log('✅ Using current userId as assignedUserIDs:', finalAssignedUserIDs);
+      }
 
       const requestBody = {
         taskID: taskID,
         projectID: projectId,
         taskName: taskData.taskName,
         description: taskData.description,
-        assignedUserIDs: taskData.assignedUserIDs.length > 0 ? taskData.assignedUserIDs : [userId],
+        assignedUserIDs: finalAssignedUserIDs,
         status: taskData.status,
         dateCreated: dateCreated,
         dueDate: taskData.dueDate,
