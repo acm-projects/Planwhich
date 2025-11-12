@@ -127,13 +127,13 @@ export default function FileManager() {
     }
 
     // If file has API fileID, delete from backend
-    if (fileToDelete?.fileID) {
+    if (fileToDelete?.id) {
       try {
         const idToken = localStorage.getItem('idToken');
         
-        console.log('🗑️ Deleting file from API:', fileToDelete.fileID);
+        console.log('🗑️ Deleting file from API:', fileToDelete.id);
         
-        const response = await fetch(`${FILES_API_URL}?fileID=${fileToDelete.fileID}`, {
+        const response = await fetch(`${FILES_API_URL}?fileID=${fileToDelete.id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${idToken}`,
