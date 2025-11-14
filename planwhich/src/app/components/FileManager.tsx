@@ -23,9 +23,22 @@ interface FolderItem {
   date: string;
 }
 
-export default function FileManager() {
+interface FileManagerProps {
+  initialFiles?: FileItem[];
+  projectId?: string;
+  onCreateFile?: (fileData: {
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+    fileContent: string;
+    tags?: string[];
+    fileURL?: string;
+  }) => Promise<any>;
+}
+
+export default function FileManager({ initialFiles = [], projectId, onCreateFile }: FileManagerProps = {}) {
   const [folders, setFolders] = useState<FolderItem[]>([]);
-  const [rootFiles, setRootFiles] = useState<FileItem[]>([]);
+  const [rootFiles, setRootFiles] = useState<FileItem[]>(initialFiles);
   const [draggedFile, setDraggedFile] = useState<{ file: FileItem; fromFolderId: number | null } | null>(null);
 
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
@@ -38,7 +51,8 @@ export default function FileManager() {
   const [showTagSelector, setShowTagSelector] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const genericTags = ['Important', 'Personal', 'Work', 'Urgent', 'Archive'];
+  const [isGeneratingTags, setIsGeneratingTags] = useState(false);
+  const [genericTags, setGenericTags] = useState(['Important', 'Personal', 'Work', 'Urgent', 'Archive']);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -54,6 +68,11 @@ export default function FileManager() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Sync internal files state with initialFiles prop
+  useEffect(() => {
+    setRootFiles(initialFiles);
+  }, [JSON.stringify(initialFiles)]);
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -64,23 +83,121 @@ export default function FileManager() {
     const files = Array.from(e.target.files || []);
     setUploadingFiles(files);
     setSelectedTags([]);
+    setGenericTags(['Important', 'Personal', 'Work', 'Urgent', 'Archive']);
     setShowTagSelector(true);
+    console.log('📁 New file upload started, tags reset to defaults');
   };
 
-  const confirmFileUpload = () => {
-    const newFiles: FileItem[] = uploadingFiles.map((file, index) => ({
-      id: Date.now() + index,
-      name: file.name,
-      size: formatFileSize(file.size),
-      sharedBy: 'You',
-      date: new Date().toLocaleDateString('en-GB'),
-      type: file.type.startsWith('image/') ? 'image' : 'document',
-      tags: selectedTags,
-    }));
-    setRootFiles((prev) => [...prev, ...newFiles]);
-    setShowTagSelector(false);
-    setUploadingFiles([]);
-    setSelectedTags([]);
+  const generateTags = async () => {
+    if (uploadingFiles.length === 0) {
+      console.log('❌ No files to generate tags for');
+      return;
+    }
+    
+    console.log('🏷️ Starting tag generation...');
+    setIsGeneratingTags(true);
+    
+    try {
+      const file = uploadingFiles[0];
+      console.log('📄 Processing file:', file.name, 'Type:', file.type);
+      
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      const base64Content = fileContent.split(',')[1];
+      console.log('✅ File read as base64, length:', base64Content.length);
+      
+      const requestBody = {
+        fileContent: base64Content,
+        projectId: projectId || 'default'
+      };
+      
+      console.log('📤 Sending request to Lambda with projectId:', requestBody.projectId);
+      
+      const response = await fetch('https://pyssvvjvrajmf525fjaadeotj40wfoti.lambda-url.us-east-1.on.aws/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      
+      console.log('📥 Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Lambda error response:', errorText);
+        throw new Error('Failed to generate tags');
+      }
+      
+      const data = await response.json();
+      console.log('✅ Lambda response:', data);
+      
+      const aiTags = Array.isArray(data.tags) ? data.tags : [];
+      console.log('🏷️ Generated tags:', aiTags);
+      
+      if (aiTags.length > 0) {
+        const updated = [...new Set([...genericTags, ...aiTags])];
+        console.log('📋 Updated tag list:', updated);
+        setGenericTags(updated);
+        setSelectedTags(aiTags);
+        console.log('✅ Auto-selected generated tags:', aiTags);
+      } else {
+        console.log('⚠️ No tags generated');
+      }
+    } catch (error) {
+      console.error('💥 Error generating tags:', error);
+      alert('Failed to generate tags. Check console for details.');
+    } finally {
+      setIsGeneratingTags(false);
+      console.log('🏁 Tag generation complete');
+    }
+  };
+
+  const confirmFileUpload = async () => {
+    try {
+      if (onCreateFile) {
+        // Use API to create files
+        for (const file of uploadingFiles) {
+          // Read file content as base64
+          const fileContent = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          
+          await onCreateFile({
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            fileContent: fileContent,
+            tags: selectedTags,
+          });
+        }
+      } else {
+        // Fallback to local state only
+        const newFiles: FileItem[] = uploadingFiles.map((file, index) => ({
+          id: Date.now() + index,
+          name: file.name,
+          size: formatFileSize(file.size),
+          sharedBy: 'You',
+          date: new Date().toLocaleDateString('en-GB'),
+          type: file.type.startsWith('image/') ? 'image' : 'document',
+          tags: selectedTags,
+        }));
+        setRootFiles((prev) => [...prev, ...newFiles]);
+      }
+      
+      setShowTagSelector(false);
+      setUploadingFiles([]);
+      setSelectedTags([]);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert('Failed to upload files. Please try again.');
+    }
   };
 
   const createFolder = () => {
@@ -220,7 +337,7 @@ export default function FileManager() {
   );
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col min-h-[600px]">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col min-h-[600px] w-full">
       {/* Header */}
       <div className="px-6 pt-6 pb-4 border-b border-gray-100" ref={menuRef}>
         <div className="flex items-center justify-between">
@@ -347,20 +464,13 @@ export default function FileManager() {
               </div>
             </div>
 
-            <button
-              onClick={confirmFileUpload}
-              className="px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
-            >
+            <button onClick={generateTags} disabled={isGeneratingTags} className="px-2 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50">
+              {isGeneratingTags ? 'Generating...' : 'Generate Tags'}
+            </button>
+            <button onClick={confirmFileUpload} className="px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors">
               Upload
             </button>
-            <button
-              onClick={() => {
-                setShowTagSelector(false);
-                setUploadingFiles([]);
-                setSelectedTags([]);
-              }}
-              className="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-md hover:bg-gray-200 transition-colors"
-            >
+            <button onClick={() => { setShowTagSelector(false); setUploadingFiles([]); setSelectedTags([]); }} className="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-md hover:bg-gray-200 transition-colors">
               Cancel
             </button>
           </div>
@@ -386,9 +496,9 @@ export default function FileManager() {
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(folder.id)}
               >
-                <div className="flex items-center gap-3" onClick={() => toggleFolder(folder.id)}>
-                  <div className="w-5 h-5 bg-yellow-400 rounded flex items-center justify-center">📁</div>
-                  <span className="text-sm text-gray-900 font-medium truncate">{folder.name}</span>
+                <div className="flex items-center gap-3 min-w-0" onClick={() => toggleFolder(folder.id)}>
+                  <div className="w-5 h-5 bg-yellow-400 rounded flex items-center justify-center flex-shrink-0">📁</div>
+                  <span className="text-sm text-gray-900 font-medium break-all overflow-wrap-anywhere">{folder.name}</span>
                 </div>
                 <span className="text-sm text-gray-600">{folder.sharedBy}</span>
                 <div className="flex items-center justify-between">
@@ -415,10 +525,10 @@ export default function FileManager() {
                       onDragStart={() => handleDragStart(file, folder.id)}
                       className="grid grid-cols-3 gap-4 items-start p-3 hover:bg-gray-50 rounded-lg cursor-move group"
                     >
-                      <div className="flex flex-col gap-1 pl-8">
-                        <div className="flex items-center gap-3">
-                          {getFileIcon(file.type)}
-                          <span className="text-sm text-gray-900 truncate">{file.name}</span>
+                      <div className="flex flex-col gap-1 pl-8 min-w-0 overflow-hidden">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="flex-shrink-0">{getFileIcon(file.type)}</div>
+                          <span className="text-sm text-gray-900 break-all overflow-wrap-anywhere">{file.name}</span>
                         </div>
                         {file.tags && file.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
@@ -455,10 +565,10 @@ export default function FileManager() {
               onDragStart={() => handleDragStart(file)}
               className="grid grid-cols-3 gap-4 items-start p-3 hover:bg-gray-50 rounded-lg cursor-move group"
             >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-3">
-                  {getFileIcon(file.type)}
-                  <span className="text-sm text-gray-900">{file.name}</span>
+              <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex-shrink-0">{getFileIcon(file.type)}</div>
+                  <span className="text-sm text-gray-900 break-all overflow-wrap-anywhere">{file.name}</span>
                 </div>
                 {file.tags && file.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus, MessageCircle, ChevronDown } from 'lucide-react';
 
 interface Member {
@@ -10,13 +10,83 @@ interface Member {
 
 type RoleType = 'Manager' | 'Member';
 
-const MemberList: React.FC = () => {
+interface MemberListProps {
+  projectId?: string;
+}
+
+const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberRole, setNewMemberRole] = useState<RoleType>('Member');
+
+  useEffect(() => {
+    if (projectId) {
+      fetchMembers();
+    }
+  }, [projectId]);
+
+  const fetchMembers = async () => {
+    if (!projectId) {
+      console.log('⚠️ No projectId, skipping fetch');
+      return;
+    }
+    
+    try {
+      const idToken = localStorage.getItem('idToken');
+      if (!idToken) {
+        console.log('⚠️ No auth token, skipping fetch');
+        return;
+      }
+
+      console.log('👥 Fetching members for project:', projectId);
+      
+      const response = await fetch(
+        `https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/projects/${projectId}/members`,
+        {
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('📥 Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Fetch members failed:', errorText);
+        throw new Error('Failed to fetch members');
+      }
+
+      const data = await response.json();
+      console.log('📊 Raw data:', data);
+      
+      const memberIDs = typeof data === 'string' ? JSON.parse(data) : data;
+      console.log('✅ Members fetched:', memberIDs);
+      console.log('📊 Is array?', Array.isArray(memberIDs));
+
+      const avatarColors: string[] = [
+        'bg-purple-600', 'bg-indigo-600', 'bg-blue-600', 'bg-pink-600', 
+        'bg-teal-600', 'bg-green-600', 'bg-red-600', 'bg-yellow-600'
+      ];
+
+      const formattedMembers: Member[] = Array.isArray(memberIDs) 
+        ? memberIDs.map((name, index) => ({
+            id: index + 1,
+            name: name,
+            role: 'Member' as RoleType,
+            avatar: avatarColors[index % avatarColors.length]
+          }))
+        : [];
+
+      setMembers(formattedMembers);
+    } catch (error) {
+      console.error('❌ Error fetching members:', error);
+    }
+  };
 
   const handleRoleChange = (memberId: number, newRole: RoleType): void => {
     setMembers(members.map(member => 
@@ -25,31 +95,55 @@ const MemberList: React.FC = () => {
     setOpenDropdown(null);
   };
 
-  const handleAddMember = (): void => {
-    if (newMemberName.trim()) {
-      const avatarColors: string[] = [
-        'bg-purple-600', 
-        'bg-indigo-600', 
-        'bg-blue-600', 
-        'bg-pink-600', 
-        'bg-teal-600', 
-        'bg-green-600', 
-        'bg-red-600', 
-        'bg-yellow-600'
-      ];
-      const randomColor = avatarColors[Math.floor(Math.random() * avatarColors.length)];
+  const handleAddMember = async (): Promise<void> => {
+    if (!newMemberName.trim()) return;
+    
+    if (!projectId) {
+      alert('No project selected');
+      return;
+    }
+
+    try {
+      const idToken = localStorage.getItem('idToken');
+      if (!idToken) {
+        alert('Please log in again');
+        return;
+      }
+
+      console.log('➕ Adding member to project:', projectId);
       
-      const newMember: Member = {
-        id: members.length + 1,
-        name: newMemberName.trim(),
-        role: newMemberRole,
-        avatar: randomColor
-      };
-      
-      setMembers([...members, newMember]);
+      const response = await fetch(
+        `https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/projects/${projectId}/members`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            memberID: newMemberName.trim(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to add member');
+      }
+
+      const data = await response.json();
+      console.log('✅ Member added:', data);
+
       setNewMemberName('');
       setNewMemberRole('Member');
       setShowAddModal(false);
+      
+      console.log('🔄 Refreshing member list...');
+      await fetchMembers();
+      console.log('🏁 Member list refreshed, current members:', members.length);
+    } catch (error) {
+      console.error('❌ Error adding member:', error);
+      alert(`Failed to add member: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -145,7 +239,7 @@ const MemberList: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Member Modal (unchanged) */}
+      {/* Add Member Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-grey bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-96">
