@@ -6,8 +6,8 @@ import ToggleSwitch from './ToggleSwitch';
 
 interface ProjectCardProps {
   project: Project;
-  onToggleVisibility?: (projectId: number) => void;
-  onClick?: (projectId: number) => void;
+  onToggleVisibility?: (projectId: string) => void; // Changed from number to string
+  onClick?: (projectId: string) => void; // Changed from number to string
 }
 
 export default function ProjectCard({ project, onToggleVisibility, onClick }: ProjectCardProps) {
@@ -71,7 +71,7 @@ export default function ProjectCard({ project, onToggleVisibility, onClick }: Pr
 
       {/* Project Image/Content Area */}
       <div className="bg-gradient-to-br from-blue-100 to-purple-100 flex-1 flex items-center justify-center text-6xl overflow-hidden">
-        {typeof project.image === 'string' && project.image.startsWith('data:') ? (
+        {typeof project.image === 'string' && (project.image.startsWith('data:') || project.image.startsWith('http')) ? (
           <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
         ) : (
           project.image
