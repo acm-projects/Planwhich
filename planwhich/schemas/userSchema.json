@@ -1,0 +1,46 @@
+{
+     "$schema": "http://json-schema.org/draft-07/schema#",
+     "title": "User",
+     "description": "A user in the system",
+     "type": "object",
+     "properties": {
+        "userID": {
+            "type": "string",
+            "description": "Unique identifier for user"
+        },
+        "username": {
+            "type": "string",
+            "description": "User's username"
+        },
+        "email": {
+            "type": "string",
+            "description": "User's email",
+            "format": "email"
+        },
+        "passwordHash": {
+            "type": "string",
+            "description": "User's password hashed"
+        },
+        "dateCreated": {
+            "type": "string",
+            "description": "Date the user was created",
+            "format": "date-time"
+        },
+        "taskIDs": {
+            "type": "array",
+            "description": "List of task IDs associated with the user",
+            "items": {
+                "type": "string"
+            }
+        },
+        "projectIDs": {
+            "type": "array",
+            "description": "List of project IDs associated with the user",
+            "items": {
+                "type": "string"
+            }
+        }
+     },
+
+     "required": ["UserID", "Username", "Email", "PasswordHash", "dateCreated"]
+}

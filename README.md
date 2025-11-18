@@ -12,13 +12,13 @@ Managing a project often means chasing down files, juggling tools, and trying to
 
 ## MVP ✔️
 
-* **Repository Creation**
-  * Auto-generate GitHub repos via GitHub API
-  * Preload default folder structures and permissions  
+* **Project Creation**
+  * Help users set up projects
+  * Add members, tasks, and organizational functions 
 
-* **Interview Dashboard**
-  * Track candidates by project  
-  * Leave feedback, rate, and update status  
+* **Project Archive**
+  * Upload notes, deck, documentation 
+  * Organize files
 
 * **Kanban Generation**
   * Create task boards for each team/project  
@@ -35,8 +35,7 @@ Managing a project often means chasing down files, juggling tools, and trying to
 
 ## Stretch Goals 💡
 
-* **Email Automation** – Send offer/rejection emails using Amazon SES (Free Tier)  
-* **Project Archive** – Upload decks, notes, and resources to Amazon S3 (Free Tier: 5GB)  
+* **Resource Chatbot** – Chatbot that answers questions about documentation
 
 ---
 

@@ -1,0 +1,37 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Meeting",
+    "description": "A meeting scheduled in the system",
+    "type": "object",
+    "properties": {
+        "meetingID": {
+            "type": "string",
+            "description": "Unique identifier for meeting"
+        },
+        "meetingTitle": {
+            "type": "string",
+            "description": "Title of the meeting"
+        },
+        "assignedUsers": {
+            "type": "array",
+            "description": "List of user IDs assigned to the meeting",
+            "items": {
+                "type": "string"
+            }
+        },
+        "projectID": {
+            "type": "string",
+            "description": "ID of the project this meeting belongs to"
+        },
+        "startTime": {
+            "type": "string",
+            "description": "Start time of the meeting",
+            "format": "date-time"
+        },
+        "endTime": {
+            "type": "string",
+            "description": "End time of the meeting",
+            "format": "date-time"
+        }
+    }
+}
