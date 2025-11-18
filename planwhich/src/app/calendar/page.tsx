@@ -3,24 +3,36 @@
 import { useState, useRef, useEffect } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
-// CSS for react-big-calendar is loaded globally in `src/app/globals.css`.
-// avoid importing it here to prevent duplicate PostCSS processing issues.
 import { Poppins } from "next/font/google";
 import Navbar from "../components/Navbar";
 
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600"] });
 const localizer = momentLocalizer(moment);
 
+// hardcoded API endpoint
+const MEETINGS_API = "https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/dev/meetings";
+
+type UiEvent = {
+  title: string;
+  start: Date;
+  end: Date;
+  meetingID?: string;
+  googleEventId?: string;
+  teamMembers?: string[];
+  meetingNote?: string;
+};
+
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<UiEvent[]>([]);
   const [tasks, setTasks] = useState<
     { id: number; date: string; text: string; status: string }[]
   >([]);
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<any | null>(null);
+  const [editingEvent, setEditingEvent] = useState<UiEvent | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     start: "",
@@ -44,7 +56,7 @@ export default function CalendarPage() {
     "Maria",
   ];
 
-  // 🔹 Close dropdown when clicking outside
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -60,12 +72,12 @@ export default function CalendarPage() {
     };
   }, []);
 
-  // 🔹 Filter tasks for the selected day
+  // Filter tasks for the selected day
   const tasksForDay = tasks.filter(
     (t) => t.date === moment(selectedDate).format("YYYY-MM-DD")
   );
 
-  // 🔹 Add new task
+  // Add new task
   const handleAddTask = () => {
     if (!newTask.trim()) return;
     const dateKey = moment(selectedDate).format("YYYY-MM-DD");
@@ -79,23 +91,31 @@ export default function CalendarPage() {
     setNewTask("");
   };
 
-  // 🔹 Delete task
+  // Delete task
   const handleDeleteTask = (id: number) => {
     setTasks(tasks.filter((t) => t.id !== id));
   };
 
-  // 🔹 Change status
+  // Change status
   const handleChangeStatus = (id: number, newStatus: string) => {
     setTasks(tasks.map((t) => (t.id === id ? { ...t, status: newStatus } : t)));
   };
 
-  // 🔹 Filter logic
+  // Filter logic
   const filteredTasks =
     filter === "all"
       ? tasksForDay
       : tasksForDay.filter((t) => t.status === filter);
 
-  // 🔹 Event form logic
+  // Get user ID (keep if needed for API authentication)
+  const getUserId = () => {
+    try {
+      return localStorage.getItem("userId") || "";
+    } catch {
+      return "";
+    }
+  };
+
   const openAddForm = () => {
     setFormData({
       title: "",
@@ -108,7 +128,7 @@ export default function CalendarPage() {
     setShowForm(true);
   };
 
-  const openEditForm = (event: any) => {
+  const openEditForm = (event: UiEvent) => {
     setEditingEvent(event);
     setFormData({
       title: event.title,
@@ -120,39 +140,87 @@ export default function CalendarPage() {
     setShowForm(true);
   };
 
-  const handleSaveEvent = () => {
-    if (!formData.title || !formData.start || !formData.end) return;
+  async function createMeetingOnServer(title: string, startISO: string, endISO: string) {
+    const payload = {
+      meetingTitle: title,
+      startTime: startISO,
+      endTime: endISO,
+      projectID: "",
+      assignedUsers: [],
+      userId: getUserId(),
+    };
 
-    const eventData = {
+    const res = await fetch(MEETINGS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok && res.status !== 207) {
+      throw new Error(json?.error || "Create meeting failed");
+    }
+    return { status: res.status, json };
+  }
+
+  const handleSaveEvent = async () => {
+    if (!formData.title || !formData.start || !formData.end || saving) return;
+
+    const startDate = new Date(formData.start);
+    const endDate = new Date(formData.end);
+    const startISO = startDate.toISOString();
+    const endISO = endDate.toISOString();
+
+    const optimistic: UiEvent = {
       title: formData.title,
-      start: new Date(formData.start),
-      end: new Date(formData.end),
+      start: startDate,
+      end: endDate,
       teamMembers: formData.teamMembers,
       meetingNote: formData.meetingNote,
     };
 
+    // Optimistically update UI
     if (editingEvent) {
-      setEvents(
-        events.map((ev) => (ev === editingEvent ? { ...ev, ...eventData } : ev))
-      );
+      setEvents((prev) => prev.map((ev) => (ev === editingEvent ? optimistic : ev)));
     } else {
-      setEvents([...events, eventData]);
+      setEvents((prev) => [...prev, optimistic]);
     }
 
-    setFormData({
-      title: "",
-      start: "",
-      end: "",
-      teamMembers: [],
-      meetingNote: "",
-    });
-    setEditingEvent(null);
-    setShowForm(false);
+    setSaving(true);
+    try {
+      const { status, json } = await createMeetingOnServer(formData.title, startISO, endISO);
+
+      // Update with server response
+      setEvents((prev) =>
+        prev.map((ev) =>
+          ev === optimistic
+            ? { ...ev, meetingID: json?.meetingID, googleEventId: json?.googleEventId }
+            : ev
+        )
+      );
+
+      if (status === 207) {
+        console.warn("Saved locally, Google sync failed:", json?.googleError);
+        alert("Meeting saved. Google Calendar sync failed. You can retry later.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(`Save failed: ${e.message || e}`);
+      // Rollback on error
+      if (!editingEvent) {
+        setEvents((prev) => prev.filter((ev) => ev !== optimistic));
+      }
+    } finally {
+      setSaving(false);
+      setFormData({ title: "", start: "", end: "", teamMembers: [], meetingNote: "" });
+      setEditingEvent(null);
+      setShowForm(false);
+    }
   };
 
   const handleDeleteEvent = () => {
     if (!editingEvent) return;
-    setEvents(events.filter((ev) => ev !== editingEvent));
+    setEvents((prev) => prev.filter((ev) => ev !== editingEvent));
     setEditingEvent(null);
     setShowForm(false);
   };
@@ -164,13 +232,13 @@ export default function CalendarPage() {
       <Navbar />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ✅ Sidebar */}
+        {/* Sidebar */}
         <aside className="w-80 p-6 bg-slate-900 text-slate-100 flex flex-col rounded-tr-3xl shadow-lg">
           <h2 className="text-xl font-semibold mb-4 text-emerald-400">
             Tasks for {moment(selectedDate).format("MMM D, YYYY")}
           </h2>
 
-          {/* 🔹 Task Input */}
+          {/* Task Input */}
           <div className="flex gap-2 mb-5">
             <input
               type="text"
@@ -187,7 +255,7 @@ export default function CalendarPage() {
             </button>
           </div>
 
-          {/* 🔹 Filter Dropdown */}
+          {/* Filter Dropdown */}
           <div className="mb-6">
             <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">
               Filter tasks
@@ -204,7 +272,7 @@ export default function CalendarPage() {
             </select>
           </div>
 
-          {/* 🔹 Task Lists */}
+          {/* Task Lists */}
           <div className="flex-1 overflow-y-auto space-y-6 pr-1">
             {["todo", "in-progress", "completed"].map((section) => (
               <div key={section}>
@@ -241,8 +309,7 @@ export default function CalendarPage() {
                         </div>
                       </li>
                     ))}
-                  {filteredTasks.filter((t) => t.status === section).length ===
-                    0 && (
+                  {filteredTasks.filter((t) => t.status === section).length === 0 && (
                     <p className="text-slate-500 text-xs ml-2">
                       No tasks in this section.
                     </p>
@@ -253,7 +320,7 @@ export default function CalendarPage() {
           </div>
         </aside>
 
-        {/* ✅ Main Calendar */}
+        {/* Main Calendar */}
         <main className="flex-1 p-8 overflow-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-semibold">Schedule Overview</h1>
@@ -265,7 +332,7 @@ export default function CalendarPage() {
             </button>
           </div>
 
-          {/* 🔹 Event Form Modal */}
+          {/* Event Form Modal */}
           {showForm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
@@ -299,7 +366,7 @@ export default function CalendarPage() {
                     className="border px-3 py-2 rounded-md"
                   />
 
-                  {/* 🔹 Searchable Multi-select for Team Members */}
+                  {/* Searchable Multi-select for Team Members */}
                   <div ref={dropdownRef} className="relative">
                     <label className="block text-sm font-medium text-slate-700 mb-1">
                       Add Team Members
@@ -339,9 +406,7 @@ export default function CalendarPage() {
 
                         {teamOptions
                           .filter((member) =>
-                            member
-                              .toLowerCase()
-                              .includes(searchTerm.toLowerCase())
+                            member.toLowerCase().includes(searchTerm.toLowerCase())
                           )
                           .map((member) => (
                             <label
@@ -354,13 +419,8 @@ export default function CalendarPage() {
                                 onChange={(e) => {
                                   const selected = e.target.checked
                                     ? [...formData.teamMembers, member]
-                                    : formData.teamMembers.filter(
-                                        (m) => m !== member
-                                      );
-                                  setFormData({
-                                    ...formData,
-                                    teamMembers: selected,
-                                  });
+                                    : formData.teamMembers.filter((m) => m !== member);
+                                  setFormData({ ...formData, teamMembers: selected });
                                 }}
                                 className="accent-emerald-500"
                               />
@@ -379,7 +439,7 @@ export default function CalendarPage() {
                     )}
                   </div>
 
-                  {/* 🔹 Meeting Notes */}
+                  {/* Meeting Notes */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
                       Meeting Notes
@@ -387,10 +447,7 @@ export default function CalendarPage() {
                     <textarea
                       value={formData.meetingNote}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          meetingNote: e.target.value,
-                        })
+                        setFormData({ ...formData, meetingNote: e.target.value })
                       }
                       placeholder="Enter meeting details..."
                       className="w-full border rounded-md px-3 py-2 text-sm h-24 resize-none"
@@ -415,9 +472,10 @@ export default function CalendarPage() {
                   </button>
                   <button
                     onClick={handleSaveEvent}
-                    className="bg-emerald-500 text-white px-3 py-1 rounded-md hover:bg-emerald-600"
+                    disabled={saving}
+                    className="bg-emerald-500 text-white px-3 py-1 rounded-md hover:bg-emerald-600 disabled:bg-emerald-300"
                   >
-                    Save
+                    {saving ? "Saving..." : "Save"}
                   </button>
                 </div>
               </div>
@@ -433,7 +491,7 @@ export default function CalendarPage() {
               endAccessor="end"
               style={{ height: "75vh" }}
               selectable
-              onSelectEvent={openEditForm}
+              onSelectEvent={(event: any) => openEditForm(event as UiEvent)}
               onSelectSlot={(slotInfo: any) => {
                 setSelectedDate(moment(slotInfo.start).toDate());
               }}
@@ -441,9 +499,7 @@ export default function CalendarPage() {
                 const isSelected = moment(date).isSame(selectedDate, "day");
                 return {
                   style: {
-                    border: isSelected
-                      ? "2px solid #10b981"
-                      : "1px solid #e5e7eb",
+                    border: isSelected ? "2px solid #10b981" : "1px solid #e5e7eb",
                     backgroundColor: isSelected ? "#ecfdf5" : "white",
                     transition: "all 0.2s ease",
                   },

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
-const ReactSelect = dynamic(() => import("react-select"), { ssr: false });
+const ReactSelect: any = dynamic(() => import("react-select").then((mod) => mod.default as any), { ssr: false });
 
 const defaultMeetingNotes = `During this morning's product sync, Aaron began by reviewing last week's progress on the mobile app. He mentioned that we still need to finalize the UI mockups before handing things off to development by next week. Rishi added that user-data syncing has improved after the recent fix, but he still needs to prepare a short performance summary for the leadership team before presenting this week. Aarya brought up issues with customer onboarding and suggested updating the tutorial screens. She agreed to create a list of improvements to the onboarding flow. Kaitlyn said she would follow up with marketing to see whether they planned to highlight the new feature in this month's newsletter. Toward the end, Aaron reminded everyone that someone must schedule a call with the design contractor to discuss icon replacements before this week's meeting. The meeting wrapped up with Jonathan offering to send a brief summary of action items.`;
 
@@ -125,7 +125,7 @@ export default function TasksSidebarPage() {
     new Set(tasks.flatMap((t) => t.assignedTo || []))
   );
 
-  function assignPerson(taskId, peopleSelected) {
+  function assignPerson(taskId: number, peopleSelected: string[]) {
     setTasks((prev) =>
       prev.map((task) =>
         task.id === taskId ? { ...task, assignedTo: peopleSelected } : task
@@ -133,7 +133,7 @@ export default function TasksSidebarPage() {
     );
   }
 
-  const grouped = tasks.reduce((acc, task) => {
+  const grouped = tasks.reduce<Record<string, typeof tasks[number][]>>((acc, task) => {
     if (!task.assignedTo || task.assignedTo.length === 0) {
       acc["Unassigned"] = acc["Unassigned"] || [];
       acc["Unassigned"].push(task);

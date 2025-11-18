@@ -2,6 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Folder, Upload, Plus, Trash2, Search } from 'lucide-react';
 
+const FILES_API_URL = 'https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/files';
+
 interface FileItem {
   id: number;
   name: string;
@@ -9,6 +11,7 @@ interface FileItem {
   sharedBy: string;
   date: string;
   type: 'document' | 'image';
+  tags?: string[];
 }
 
 interface FolderItem {
@@ -21,17 +24,21 @@ interface FolderItem {
 }
 
 export default function FileManager() {
-  const [folders, setFolders] = useState<FolderItem[]>([
-  ]);
-
-  const [rootFiles, setRootFiles] = useState<FileItem[]>([
-  ]);
-
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [rootFiles, setRootFiles] = useState<FileItem[]>([]);
   const [draggedFile, setDraggedFile] = useState<{ file: FileItem; fromFolderId: number | null } | null>(null);
+
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+
+  // File upload + tag states
+  const [showTagSelector, setShowTagSelector] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const genericTags = ['Important', 'Personal', 'Work', 'Urgent', 'Archive'];
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +47,7 @@ export default function FileManager() {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowAddMenu(false);
         setShowNewFolderInput(false);
+        setShowTagSelector(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -52,18 +60,27 @@ export default function FileManager() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const newFiles: FileItem[] = files.map((file, index) => ({
+    setUploadingFiles(files);
+    setSelectedTags([]);
+    setShowTagSelector(true);
+  };
+
+  const confirmFileUpload = () => {
+    const newFiles: FileItem[] = uploadingFiles.map((file, index) => ({
       id: Date.now() + index,
       name: file.name,
       size: formatFileSize(file.size),
       sharedBy: 'You',
       date: new Date().toLocaleDateString('en-GB'),
       type: file.type.startsWith('image/') ? 'image' : 'document',
+      tags: selectedTags,
     }));
-
     setRootFiles((prev) => [...prev, ...newFiles]);
+    setShowTagSelector(false);
+    setUploadingFiles([]);
+    setSelectedTags([]);
   };
 
   const createFolder = () => {
@@ -98,7 +115,44 @@ export default function FileManager() {
     setFolders((prev) => prev.filter((f) => f.id !== folderId));
   };
 
-  const deleteFile = (fileId: number, folderId: number | null = null) => {
+  const deleteFile = async (fileId: number, folderId: number | null = null) => {
+    // Find the file to get its fileID
+    let fileToDelete: FileItem | undefined;
+    
+    if (folderId) {
+      const folder = folders.find(f => f.id === folderId);
+      fileToDelete = folder?.files.find(f => f.id === fileId);
+    } else {
+      fileToDelete = rootFiles.find(f => f.id === fileId);
+    }
+
+    // If file has API fileID, delete from backend
+    if (fileToDelete?.fileID) {
+      try {
+        const idToken = localStorage.getItem('idToken');
+        
+        console.log('🗑️ Deleting file from API:', fileToDelete.fileID);
+        
+        const response = await fetch(`${FILES_API_URL}?fileID=${fileToDelete.fileID}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete file from server');
+        }
+
+        console.log('✅ File deleted from API');
+      } catch (error) {
+        console.error('❌ Error deleting file:', error);
+        alert('Failed to delete file from server');
+        return;
+      }
+    }
+
+    // Remove from local state
     if (folderId) {
       setFolders((prev) =>
         prev.map((f) =>
@@ -165,194 +219,275 @@ export default function FileManager() {
     file.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
- return (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col min-h-[600px]">
-    {/* Sticky Header */}
-   <div className="px-6 pt-6 pb-4 border-b border-gray-100" ref={menuRef}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">My Files</h2>
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col min-h-[600px]">
+      {/* Header */}
+      <div className="px-6 pt-6 pb-4 border-b border-gray-100" ref={menuRef}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">My Files</h2>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
 
-          {/* Add Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setShowAddMenu(!showAddMenu)}
-              className="p-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowAddMenu(!showAddMenu)}
+                className="p-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
 
-            {showAddMenu && (
-              <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10">
-                <label className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors text-sm">
-                  <Upload className="w-4 h-4 text-gray-600" />
-                  Upload Files
-                  <input
-                    type="file"
-                    multiple
-                    onChange={(e) => {
-                      handleFileUpload(e);
+              {showAddMenu && (
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10">
+                  <label className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors text-sm">
+                    <Upload className="w-4 h-4 text-gray-600" />
+                    Upload Files
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => {
+                        handleFileUpload(e);
+                        setShowAddMenu(false);
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    onClick={() => {
+                      setShowNewFolderInput(true);
                       setShowAddMenu(false);
                     }}
-                    className="hidden"
-                  />
-                </label>
-                <button
-                  onClick={() => {
-                    setShowNewFolderInput(true);
-                    setShowAddMenu(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-left text-sm"
-                >
-                  <Folder className="w-4 h-4 text-gray-600" />
-                  New Folder
-                </button>
-              </div>
-            )}
+                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-left text-sm"
+                  >
+                    <Folder className="w-4 h-4 text-gray-600" />
+                    New Folder
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* New Folder Input */}
-      {showNewFolderInput && (
-        <div className="flex gap-2 mt-3">
-          <input
-            type="text"
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && createFolder()}
-            placeholder="Folder name"
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-            autoFocus
-          />
-          <button
-            onClick={createFolder}
-            className="px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
-          >
-            Create
-          </button>
-          <button
-            onClick={() => {
-              setShowNewFolderInput(false);
-              setNewFolderName('');
-            }}
-            className="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-md hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-    </div>
-
-    {/* Scrollable File List */}
-    <div className="px-6 pb-6 overflow-y-auto">
-      <div className="grid grid-cols-3 gap-4 pb-3 py-4 border-b border-gray-100 mb-2">
-        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
-          Name <span className="text-gray-400">↑</span>
-        </div>
-        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Shared by</div>
-        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Creation Date</div>
-      </div>
-
-      {/* Folder & File Items */}
-      <div className="space-y-1">
-        {filteredFolders.map((folder) => (
-          <div key={folder.id}>
-            <div
-              className="grid grid-cols-3 gap-4 items-center p-3 hover:bg-gray-50 rounded-lg cursor-pointer group"
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(folder.id)}
+        {/* New Folder Input */}
+        {showNewFolderInput && (
+          <div className="flex gap-2 mt-3">
+            <input
+              type="text"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && createFolder()}
+              placeholder="Folder name"
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              autoFocus
+            />
+            <button
+              onClick={createFolder}
+              className="px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
             >
-              <div className="flex items-center gap-3" onClick={() => toggleFolder(folder.id)}>
-                <div className="w-5 h-5 bg-yellow-400 rounded flex items-center justify-center">📁</div>
-                <span className="text-sm text-gray-900 font-medium truncate">{folder.name}</span>
+              Create
+            </button>
+            <button
+              onClick={() => {
+                setShowNewFolderInput(false);
+                setNewFolderName('');
+              }}
+              className="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-md hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Tag selector for new uploads */}
+        {showTagSelector && (
+          <div className="relative flex gap-2 mt-3">
+            <div className="flex-1 relative">
+              <button
+                type="button"
+                className="w-full text-left px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex flex-wrap gap-1 items-center"
+              >
+                {selectedTags.length === 0 ? (
+                  <span className="text-gray-400 text-sm">Select tags...</span>
+                ) : (
+                  selectedTags.map((tag) => (
+                    <span key={tag} className="bg-green-200 text-green-800 px-2 py-0.5 rounded-full text-xs">
+                      {tag}
+                    </span>
+                  ))
+                )}
+              </button>
+
+              <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg z-10 max-h-40 overflow-auto">
+                {genericTags.map((tag) => (
+                  <div key={tag}>
+                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedTags.includes(tag)}
+                        onChange={() => {
+                          if (selectedTags.includes(tag)) {
+                            setSelectedTags(selectedTags.filter((t) => t !== tag));
+                          } else {
+                            setSelectedTags([...selectedTags, tag]);
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-gray-700">{tag}</span>
+                    </label>
+                  </div>
+                ))}
               </div>
-              <span className="text-sm text-gray-600">{folder.sharedBy}</span>
+            </div>
+
+            <button
+              onClick={confirmFileUpload}
+              className="px-3 py-2 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
+            >
+              Upload
+            </button>
+            <button
+              onClick={() => {
+                setShowTagSelector(false);
+                setUploadingFiles([]);
+                setSelectedTags([]);
+              }}
+              className="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-md hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Scrollable file list */}
+      <div className="px-6 pb-6 overflow-y-auto">
+        <div className="grid grid-cols-3 gap-4 pb-3 py-4 border-b border-gray-100 mb-2">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
+            Name <span className="text-gray-400">↑</span>
+          </div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Shared by</div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Creation Date</div>
+        </div>
+
+        <div className="space-y-1">
+          {/* Folders */}
+          {filteredFolders.map((folder) => (
+            <div key={folder.id}>
+              <div
+                className="grid grid-cols-3 gap-4 items-center p-3 hover:bg-gray-50 rounded-lg cursor-pointer group"
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(folder.id)}
+              >
+                <div className="flex items-center gap-3" onClick={() => toggleFolder(folder.id)}>
+                  <div className="w-5 h-5 bg-yellow-400 rounded flex items-center justify-center">📁</div>
+                  <span className="text-sm text-gray-900 font-medium truncate">{folder.name}</span>
+                </div>
+                <span className="text-sm text-gray-600">{folder.sharedBy}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{folder.date}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteFolder(folder.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all"
+                  >
+                    <Trash2 className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Files inside folder */}
+              {folder.isOpen && folder.files.length > 0 && (
+                <div className="space-y-1 mt-1">
+                  {folder.files.map((file) => (
+                    <div
+                      key={file.id}
+                      draggable
+                      onDragStart={() => handleDragStart(file, folder.id)}
+                      className="grid grid-cols-3 gap-4 items-start p-3 hover:bg-gray-50 rounded-lg cursor-move group"
+                    >
+                      <div className="flex flex-col gap-1 pl-8">
+                        <div className="flex items-center gap-3">
+                          {getFileIcon(file.type)}
+                          <span className="text-sm text-gray-900 truncate">{file.name}</span>
+                        </div>
+                        {file.tags && file.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {file.tags.map((tag) => (
+                              <span key={tag} className="bg-green-200 text-green-800 px-2 py-0.5 rounded-full text-xs">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-sm text-gray-600">{file.sharedBy}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">{file.date}</span>
+                        <button
+                          onClick={() => deleteFile(file.id, folder.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all"
+                        >
+                          <Trash2 className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Root files */}
+          {filteredFiles.map((file) => (
+            <div
+              key={file.id}
+              draggable
+              onDragStart={() => handleDragStart(file)}
+              className="grid grid-cols-3 gap-4 items-start p-3 hover:bg-gray-50 rounded-lg cursor-move group"
+            >
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3">
+                  {getFileIcon(file.type)}
+                  <span className="text-sm text-gray-900">{file.name}</span>
+                </div>
+                {file.tags && file.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {file.tags.map((tag) => (
+                      <span key={tag} className="bg-green-200 text-green-800 px-2 py-0.5 rounded-full text-xs">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="text-sm text-gray-600">{file.sharedBy}</span>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">{folder.date}</span>
+                <span className="text-sm text-gray-600">{file.date}</span>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteFolder(folder.id);
-                  }}
+                  onClick={() => deleteFile(file.id)}
                   className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all"
                 >
                   <Trash2 className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
             </div>
+          ))}
 
-            {folder.isOpen && folder.files.length > 0 && (
-              <div className="space-y-1 mt-1">
-                {folder.files.map((file) => (
-                  <div
-                    key={file.id}
-                    draggable
-                    onDragStart={() => handleDragStart(file, folder.id)}
-                    className="grid grid-cols-3 gap-4 items-center p-3 hover:bg-gray-50 rounded-lg cursor-move group"
-                  >
-                    <div className="flex items-center gap-3 pl-8">
-                      {getFileIcon(file.type)}
-                      <span className="text-sm text-gray-900 truncate">{file.name}</span>
-                    </div>
-                    <span className="text-sm text-gray-600">{file.sharedBy}</span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">{file.date}</span>
-                      <button
-                        onClick={() => deleteFile(file.id, folder.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all"
-                      >
-                        <Trash2 className="w-4 h-4 text-gray-400" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-
-        {filteredFiles.map((file) => (
-          <div
-            key={file.id}
-            draggable
-            onDragStart={() => handleDragStart(file)}
-            className="grid grid-cols-3 gap-4 items-center p-3 hover:bg-gray-50 rounded-lg cursor-move group"
-          >
-            <div className="flex items-center gap-3">
-              {getFileIcon(file.type)}
-              <span className="text-sm text-gray-900">{file.name}</span>
-            </div>
-            <span className="text-sm text-gray-600">{file.sharedBy}</span>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">{file.date}</span>
-              <button
-                onClick={() => deleteFile(file.id)}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all"
-              >
-                <Trash2 className="w-4 h-4 text-gray-400" />
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {/* Empty State */}
-        {filteredFolders.length === 0 && filteredFiles.length === 0 && (
-          <p className="text-gray-500 text-sm text-center mt-4">No files found.</p>
-        )}
+          {filteredFolders.length === 0 && filteredFiles.length === 0 && (
+            <p className="text-gray-500 text-sm text-center mt-4">No files found.</p>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
