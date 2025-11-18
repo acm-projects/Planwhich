@@ -127,13 +127,15 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to add member');
+        alert('User not added. Check spelling or user does not exist.');
+        return;
       }
 
       const data = await response.json();
       console.log('✅ Member added:', data);
 
+      alert('User added successfully!');
+      
       setNewMemberName('');
       setNewMemberRole('Member');
       setShowAddModal(false);
@@ -143,7 +145,7 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
       console.log('🏁 Member list refreshed, current members:', members.length);
     } catch (error) {
       console.error('❌ Error adding member:', error);
-      alert(`Failed to add member: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert('User not added. Check spelling or user does not exist.');
     }
   };
 
