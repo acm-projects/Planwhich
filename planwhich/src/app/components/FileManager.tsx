@@ -5,7 +5,7 @@ import { Folder, Upload, Plus, Trash2, Search } from 'lucide-react';
 const FILES_API_URL = 'https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/files';
 
 interface FileItem {
-  id: number;
+  id: string | number;
   name: string;
   size: string;
   sharedBy: string;
@@ -232,7 +232,7 @@ export default function FileManager({ initialFiles = [], projectId, onCreateFile
     setFolders((prev) => prev.filter((f) => f.id !== folderId));
   };
 
-  const deleteFile = async (fileId: number, folderId: number | null = null) => {
+  const deleteFile = async (fileId: string | number, folderId: number | null = null) => {
     // Find the file to get its fileID
     let fileToDelete: FileItem | undefined;
     
@@ -248,19 +248,37 @@ export default function FileManager({ initialFiles = [], projectId, onCreateFile
       try {
         const idToken = localStorage.getItem('idToken');
         
-        console.log('🗑️ Deleting file from API:', fileToDelete.id);
+        if (!idToken) {
+          alert('Please log in again to delete files');
+          return;
+        }
         
-        const response = await fetch(`${FILES_API_URL}?fileID=${fileToDelete.id}`, {
+        console.log('🗑️ Deleting file from API:', fileToDelete.id);
+        console.log('🔑 Using token:', idToken ? 'Token found' : 'No token');
+        
+        const response = await fetch(`${FILES_API_URL}/${fileToDelete.id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
           },
         });
 
+        console.log('📝 Response status:', response.status);
+        
+        if (response.status === 401) {
+          alert('Authentication failed. Please log in again.');
+          return;
+        }
+        
         if (!response.ok) {
-          throw new Error('Failed to delete file from server');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('❌ Delete failed:', errorData);
+          alert('Failed to delete file from server');
+          return;
         }
 
+        alert('File deleted successfully!');
         console.log('✅ File deleted from API');
       } catch (error) {
         console.error('❌ Error deleting file:', error);
@@ -337,7 +355,7 @@ export default function FileManager({ initialFiles = [], projectId, onCreateFile
   );
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col min-h-[600px] w-full">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full w-full">
       {/* Header */}
       <div className="px-6 pt-6 pb-4 border-b border-gray-100" ref={menuRef}>
         <div className="flex items-center justify-between">
@@ -478,7 +496,7 @@ export default function FileManager({ initialFiles = [], projectId, onCreateFile
       </div>
 
       {/* Scrollable file list */}
-      <div className="px-6 pb-6 overflow-y-auto">
+      <div className="flex-1 px-6 pb-6 overflow-y-auto min-h-0">
         <div className="grid grid-cols-3 gap-4 pb-3 py-4 border-b border-gray-100 mb-2">
           <div className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
             Name <span className="text-gray-400">↑</span>

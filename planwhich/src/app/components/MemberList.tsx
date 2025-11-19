@@ -67,6 +67,7 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
       const memberIDs = typeof data === 'string' ? JSON.parse(data) : data;
       console.log('✅ Members fetched:', memberIDs);
       console.log('📊 Is array?', Array.isArray(memberIDs));
+      console.log('📊 First member:', memberIDs[0]);
 
       const avatarColors: string[] = [
         'bg-purple-600', 'bg-indigo-600', 'bg-blue-600', 'bg-pink-600', 
@@ -74,12 +75,16 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
       ];
 
       const formattedMembers: Member[] = Array.isArray(memberIDs) 
-        ? memberIDs.map((name, index) => ({
-            id: index + 1,
-            name: name,
-            role: 'Member' as RoleType,
-            avatar: avatarColors[index % avatarColors.length]
-          }))
+        ? memberIDs.map((user, index) => {
+            console.log('👤 User data:', user);
+            console.log('🖼️ Profile picture:', user.profilePicture);
+            return {
+              id: index + 1,
+              name: user.username || user.UserID || user,
+              role: 'Member' as RoleType,
+              avatar: user.profilePicture || avatarColors[index % avatarColors.length]
+            };
+          })
         : [];
 
       setMembers(formattedMembers);
@@ -195,9 +200,17 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
             >
               {/* Left Side: Avatar and Info */}
               <div className="flex items-center space-x-3 flex-1">
-                <div className={`w-9 h-9 rounded-full ${member.avatar} flex items-center justify-center text-white font-medium text-sm`}>
-                  {getInitials(member.name)}
-                </div>
+                {member.avatar && member.avatar.startsWith('http') ? (
+                  <img 
+                    src={member.avatar} 
+                    alt={member.name}
+                    className="w-9 h-9 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className={`w-9 h-9 rounded-full ${member.avatar} flex items-center justify-center text-white font-medium text-sm`}>
+                    {getInitials(member.name)}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900">{member.name}</p>
                   <div className="relative">

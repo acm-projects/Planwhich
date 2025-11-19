@@ -40,6 +40,9 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [files, setFiles] = useState<any[]>([]);
   const [projectName, setProjectName] = useState<string>('Project');
+  const [userMap, setUserMap] = useState<Record<string, string>>({});
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   useEffect(() => {
     const name = localStorage.getItem('currentProjectName');
@@ -54,13 +57,56 @@ export default function DashboardPage() {
     console.log('🔍 All search params:', Object.fromEntries(searchParams.entries()));
   }, [projectId, searchParams]);
 
-  // Fetch tasks and files when projectId changes
+  // Fetch tasks, files, and users when projectId changes
   useEffect(() => {
     if (projectId) {
       fetchProjectTasks();
       fetchProjectFiles();
+      fetchUsers();
     }
   }, [projectId]);
+
+  const fetchUsers = async () => {
+    if (!projectId) return;
+    
+    try {
+      const idToken = localStorage.getItem('idToken');
+      if (!idToken) {
+        setUsersLoaded(true);
+        return;
+      }
+
+      const response = await fetch(
+        `https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/projects/${projectId}/members`,
+        {
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const users = await response.json();
+        const mapping: Record<string, string> = {};
+        
+        users.forEach((user: any) => {
+          mapping[user.UserID] = user.username;
+        });
+        
+        console.log('👥 User mapping loaded:', mapping);
+        setUserMap(mapping);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setUsersLoaded(true);
+    }
+  };
+
+  const getUserName = (userID: string): string => {
+    return userMap[userID] || userID;
+  };
 
   const fetchProjectTasks = async () => {
     if (!projectId) return;
@@ -144,7 +190,7 @@ export default function DashboardPage() {
       taskID: task.taskID,
       name: task.taskName,
       description: task.description,
-      collaborators: task.assignedUserIDs.join(', '),
+      collaborators: task.assignedUserIDs.map(getUserName).join(', '),
       status: task.status === 'To Do' ? 'To-Do' : 
               task.status === 'In Progress' ? 'In Progress' : 'Complete',
       dueDate: task.dueDate || 'No date'
@@ -354,9 +400,25 @@ export default function DashboardPage() {
     );
   }
 
+  const storedProfilePicture = localStorage.getItem('profilePicture');
+  const userName = localStorage.getItem('name') || 'User';
+  const userInitials = userName.charAt(0).toUpperCase();
+  const currentProfilePicture = profilePicture || storedProfilePicture;
+  
+  // Initialize profile picture from localStorage on mount
+  useEffect(() => {
+    const storedPicture = localStorage.getItem('profilePicture');
+    if (storedPicture) {
+      setProfilePicture(storedPicture);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
-      <Navbar />
+      <Navbar 
+        profileImage={currentProfilePicture || undefined}
+        userInitials={userInitials}
+      />
       <div className="p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">{projectName}</h1>
 
@@ -382,25 +444,37 @@ export default function DashboardPage() {
           </div>
 
           {/* Right Section - My Files */}
-          <div className="flex flex-col min-h-[400px] overflow-hidden">
-            <FileManager 
-              key={files.length}
-              projectId={projectId || undefined}
-              initialFiles={files.map((file, index) => {
-                const fileTags = file.tags || file.Tags || file.fileTags || [];
-                console.log('📄 File:', file.fileName, 'Tags:', fileTags, 'Full object:', file);
-                return {
-                  id: index + 1,
-                  name: file.fileName,
-                  size: file.fileSize || 'Unknown',
-                  sharedBy: file.uploadedBy || file.uploaderName || 'Unknown',
-                  date: file.dateUploaded ? new Date(file.dateUploaded).toLocaleDateString('en-US') : 'Unknown',
-                  type: file.fileType?.startsWith('image/') ? 'image' : 'document',
-                  tags: fileTags,
-                };
-              })}
-              onCreateFile={createFile}
-            />
+          <div className="flex flex-col min-h-[400px]">
+            {usersLoaded ? (
+              <FileManager 
+                key={`${files.length}-${Object.keys(userMap).length}`}
+                projectId={projectId || undefined}
+                initialFiles={files.map((file, index) => {
+                  const fileTags = file.tags || file.Tags || file.fileTags || [];
+                  
+                  // The UserID is stored in uploadedBy field, not uploaderID
+                  const actualUploaderID = file.uploadedBy || file.uploaderID;
+                  const uploaderName = actualUploaderID && userMap[actualUploaderID] 
+                    ? userMap[actualUploaderID] 
+                    : (file.uploaderName || actualUploaderID || 'Unknown');
+                  
+                  return {
+                    id: file.FileID || file.fileID || `local_${index + 1}`,
+                    name: file.fileName,
+                    size: file.fileSize || 'Unknown',
+                    sharedBy: uploaderName,
+                    date: file.dateUploaded ? new Date(file.dateUploaded).toLocaleDateString('en-US') : 'Unknown',
+                    type: file.fileType?.startsWith('image/') ? 'image' : 'document',
+                    tags: fileTags,
+                  };
+                })}
+                onCreateFile={createFile}
+              />
+            ) : (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center h-full">
+                <p className="text-gray-500">Loading files...</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
