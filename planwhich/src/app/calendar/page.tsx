@@ -11,6 +11,7 @@ const localizer = momentLocalizer(moment);
 
 // hardcoded API endpoint
 const MEETINGS_API = "https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/dev/meetings";
+const TASKS_API = "https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/ExtractMeetingNotesTasks";
 
 type UiEvent = {
   title: string;
@@ -22,17 +23,132 @@ type UiEvent = {
   meetingNote?: string;
 };
 
+// Function to fetch tasks from Lambda
+async function fetchTasksFromLambda(meetingNotes: string) {
+  try {
+    const response = await fetch(TASKS_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        textInput: meetingNotes
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.tags;
+  } catch (error) {
+    console.error('Error fetching tasks:', error);
+    return null;
+  }
+}
+
+// Parse OpenAI response into task objects
+function parseTasksFromAI(aiResponse: string) {
+  const lines = aiResponse.split('\n').filter(line => line.trim());
+  
+  return lines.map((line, index) => {
+    const cleanLine = line.replace(/^[-•*]\s*/, '').trim();
+    
+    // Skip if line is empty or looks like a placeholder
+    if (!cleanLine || 
+        cleanLine.toLowerCase().includes('task description') ||
+        cleanLine.toLowerCase() === 'duedate' ||
+        cleanLine.length < 3) {
+      return null;
+    }
+    
+    // Try to match: "Name: Task by Date"
+    const matchWithDue = cleanLine.match(/^([^:]+):\s*(.+?)\s+by\s+(.+)$/i);
+    
+    if (matchWithDue) {
+      const name = matchWithDue[1].trim();
+      const taskText = matchWithDue[2].trim();
+      const dueDate = matchWithDue[3].trim();
+      
+      // Validate it's not a placeholder
+      if (name.toLowerCase() === 'task' || 
+          name.toLowerCase() === 'personname' ||
+          taskText.toLowerCase().includes('task description') ||
+          dueDate.toLowerCase() === 'duedate') {
+        return null;
+      }
+      
+      return {
+        text: taskText,
+        assignedTo: name,
+        dueDate: dueDate
+      };
+    }
+    
+    // Match: "Name: Task" (no due date)
+    const matchNoDue = cleanLine.match(/^([^:]+):\s*(.+)$/);
+    
+    if (matchNoDue) {
+      const name = matchNoDue[1].trim();
+      const taskText = matchNoDue[2].trim();
+      
+      // Validate it's not a placeholder
+      if (name.toLowerCase() === 'task' || 
+          name.toLowerCase() === 'personname' ||
+          name.toLowerCase() === 'assigned to' ||
+          taskText.toLowerCase().includes('task description')) {
+        return null;
+      }
+      
+      return {
+        text: taskText,
+        assignedTo: name,
+        dueDate: null
+      };
+    }
+    
+    // Match: "Task by Date" (no name)
+    const matchTaskWithDue = cleanLine.match(/^(.+?)\s+by\s+(.+)$/i);
+    
+    if (matchTaskWithDue) {
+      const taskText = matchTaskWithDue[1].trim();
+      const dueDate = matchTaskWithDue[2].trim();
+      
+      // Validate it's not a placeholder
+      if (taskText.toLowerCase().includes('task description') ||
+          dueDate.toLowerCase() === 'duedate') {
+        return null;
+      }
+      
+      return {
+        text: taskText,
+        assignedTo: null,
+        dueDate: dueDate
+      };
+    }
+    
+    // Just task text, no name or due date
+    return {
+      text: cleanLine,
+      assignedTo: null,
+      dueDate: null
+    };
+  }).filter(task => task !== null);
+}
+
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<UiEvent[]>([]);
-  const [tasks, setTasks] = useState<
-    { id: number; date: string; text: string; status: string }[]
-  >([]);
+  const [tasks, setTasks] = useState
+    <{ id: number; date: string; text: string; status: string }[]
+>([]);
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<UiEvent | null>(null);
   const [saving, setSaving] = useState(false);
+  const [generatingTasks, setGeneratingTasks] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     start: "",
@@ -187,7 +303,9 @@ export default function CalendarPage() {
     }
 
     setSaving(true);
+    
     try {
+      // Save meeting to server
       const { status, json } = await createMeetingOnServer(formData.title, startISO, endISO);
 
       // Update with server response
@@ -198,6 +316,30 @@ export default function CalendarPage() {
             : ev
         )
       );
+
+      //generate tasks from meeting notes if provided
+      if (formData.meetingNote && formData.meetingNote.trim()) {
+        setGeneratingTasks(true);
+        const tasksFromAPI = await fetchTasksFromLambda(formData.meetingNote);
+        
+        if (tasksFromAPI) {
+          const parsedTasks = parseTasksFromAI(tasksFromAPI);
+          const dateKey = moment(startDate).format("YYYY-MM-DD");
+          
+          // Add generated tasks to the task list
+          const newTasks = parsedTasks.map((task: any, index: number) => ({
+            id: Date.now() + index,
+            date: dateKey,
+            text: task.assignedTo 
+              ? `${task.assignedTo}: ${task.text}${task.dueDate ? ` (Due: ${task.dueDate})` : ''}`
+              : `${task.text}${task.dueDate ? ` (Due: ${task.dueDate})` : ''}`,
+            status: "todo",
+          }));
+          
+          setTasks((prev) => [...prev, ...newTasks]);
+        }
+        setGeneratingTasks(false);
+      }
 
       if (status === 207) {
         console.warn("Saved locally, Google sync failed:", json?.googleError);
@@ -212,6 +354,7 @@ export default function CalendarPage() {
       }
     } finally {
       setSaving(false);
+      setGeneratingTasks(false);
       setFormData({ title: "", start: "", end: "", teamMembers: [], meetingNote: "" });
       setEditingEvent(null);
       setShowForm(false);
@@ -271,6 +414,12 @@ export default function CalendarPage() {
               <option value="completed">Completed</option>
             </select>
           </div>
+
+          {generatingTasks && (
+            <div className="mb-4 p-3 bg-emerald-900/50 rounded-lg text-center text-sm">
+              Generating tasks from meeting notes...
+            </div>
+          )}
 
           {/* Task Lists */}
           <div className="flex-1 overflow-y-auto space-y-6 pr-1">
@@ -335,7 +484,7 @@ export default function CalendarPage() {
           {/* Event Form Modal */}
           {showForm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
+              <div className="bg-white rounded-xl p-6 w-96 shadow-lg max-h-[90vh] overflow-y-auto">
                 <h2 className="text-xl font-semibold mb-4">
                   {editingEvent ? "Edit Event" : "Add Event"}
                 </h2>
@@ -444,13 +593,16 @@ export default function CalendarPage() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">
                       Meeting Notes
                     </label>
+                    <p className="text-xs text-slate-500 mb-2">
+                      Tasks will be automatically generated from your notes when you save.
+                    </p>
                     <textarea
                       value={formData.meetingNote}
                       onChange={(e) =>
                         setFormData({ ...formData, meetingNote: e.target.value })
                       }
-                      placeholder="Enter meeting details..."
-                      className="w-full border rounded-md px-3 py-2 text-sm h-24 resize-none"
+                      placeholder="Enter meeting details... (e.g., 'Sarah: Finalize UI mockups by Friday')"
+                      className="w-full border rounded-md px-3 py-2 text-sm h-32 resize-none"
                     />
                   </div>
                 </div>
@@ -472,10 +624,10 @@ export default function CalendarPage() {
                   </button>
                   <button
                     onClick={handleSaveEvent}
-                    disabled={saving}
+                    disabled={saving || generatingTasks}
                     className="bg-emerald-500 text-white px-3 py-1 rounded-md hover:bg-emerald-600 disabled:bg-emerald-300"
                   >
-                    {saving ? "Saving..." : "Save"}
+                    {saving || generatingTasks ? "Saving..." : "Save"}
                   </button>
                 </div>
               </div>

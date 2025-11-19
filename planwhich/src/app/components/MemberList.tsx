@@ -116,6 +116,7 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
       }
 
       console.log('➕ Adding member to project:', projectId);
+      console.log('📤 Request body:', { memberID: newMemberName.trim() });
       
       const response = await fetch(
         `https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/projects/${projectId}/members`,
@@ -131,13 +132,18 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
         }
       );
 
+      console.log('📥 Response status:', response.status);
+
       if (!response.ok) {
-        alert('User not added. Check spelling or user does not exist.');
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('❌ Add member failed:', errorData);
+        alert(`User not added: ${errorData.message || 'Check spelling or user does not exist.'}`);
         return;
       }
 
       const data = await response.json();
       console.log('✅ Member added:', data);
+      console.log('✅ Response data:', JSON.stringify(data, null, 2));
 
       alert('User added successfully!');
       
