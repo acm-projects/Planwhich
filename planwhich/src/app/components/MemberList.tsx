@@ -6,12 +6,20 @@ interface Member {
   name: string;
   role: 'Manager' | 'Member';
   avatar: string;
+  userId?: string; // Added to store the actual UserID from API
 }
 
 type RoleType = 'Manager' | 'Member';
 
 interface MemberListProps {
   projectId?: string;
+}
+
+// API response type
+interface ApiMember {
+  UserID: string;
+  username: string;
+  email: string;
 }
 
 const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
@@ -64,24 +72,49 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
       const data = await response.json();
       console.log('📊 Raw data:', data);
       
-      const memberIDs = typeof data === 'string' ? JSON.parse(data) : data;
-      console.log('✅ Members fetched:', memberIDs);
-      console.log('📊 Is array?', Array.isArray(memberIDs));
+      const memberData = typeof data === 'string' ? JSON.parse(data) : data;
+      console.log('✅ Members fetched:', memberData);
+      console.log('📊 Is array?', Array.isArray(memberData));
 
       const avatarColors: string[] = [
         'bg-purple-600', 'bg-indigo-600', 'bg-blue-600', 'bg-pink-600', 
         'bg-teal-600', 'bg-green-600', 'bg-red-600', 'bg-yellow-600'
       ];
 
-      const formattedMembers: Member[] = Array.isArray(memberIDs) 
-        ? memberIDs.map((name, index) => ({
-            id: index + 1,
-            name: name,
-            role: 'Member' as RoleType,
-            avatar: avatarColors[index % avatarColors.length]
-          }))
+      // Handle different API response formats
+      const formattedMembers: Member[] = Array.isArray(memberData) 
+        ? memberData.map((member, index) => {
+            // Check if member is an object with username/UserID or just a string
+            if (typeof member === 'object' && member !== null) {
+              // API returned object format: {UserID, username, email}
+              return {
+                id: index + 1,
+                name: member.username || member.UserID || 'Unknown User',
+                userId: member.UserID,
+                role: 'Member' as RoleType,
+                avatar: avatarColors[index % avatarColors.length]
+              };
+            } else if (typeof member === 'string') {
+              // API returned string format (just usernames or IDs)
+              return {
+                id: index + 1,
+                name: member,
+                role: 'Member' as RoleType,
+                avatar: avatarColors[index % avatarColors.length]
+              };
+            } else {
+              // Fallback for unexpected formats
+              return {
+                id: index + 1,
+                name: 'Unknown User',
+                role: 'Member' as RoleType,
+                avatar: avatarColors[index % avatarColors.length]
+              };
+            }
+          })
         : [];
 
+      console.log('✅ Formatted members:', formattedMembers);
       setMembers(formattedMembers);
     } catch (error) {
       console.error('❌ Error fetching members:', error);
@@ -142,18 +175,22 @@ const MemberList: React.FC<MemberListProps> = ({ projectId }) => {
       
       console.log('🔄 Refreshing member list...');
       await fetchMembers();
-      console.log('🏁 Member list refreshed, current members:', members.length);
+      console.log('🏁 Member list refreshed');
     } catch (error) {
       console.error('❌ Error adding member:', error);
       alert('User not added. Check spelling or user does not exist.');
     }
   };
 
+  // Fixed filter with safety check
   const filteredMembers: Member[] = members.filter(member =>
+    member.name && 
+    typeof member.name === 'string' && 
     member.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getInitials = (name: string): string => {
+    if (!name || typeof name !== 'string') return '?';
     return name.charAt(0).toUpperCase();
   };
 
