@@ -1,0 +1,12 @@
+[
+  {"name":"next-dev","duration":369676,"timestamp":3803349662192,"id":1,"tags":{},"startTime":1761172780291,"traceId":"02968efd4148d31f"},
+  {"name":"next-dev","duration":345897,"timestamp":3803416855653,"id":1,"tags":{},"startTime":1761172847484,"traceId":"3565b5799d4aa8bf"},
+  {"name":"next-dev","duration":349461,"timestamp":3803456055753,"id":1,"tags":{},"startTime":1761172886684,"traceId":"97dae60e252150ee"},
+  {"name":"next-dev","duration":391694,"timestamp":3803564911544,"id":1,"tags":{},"startTime":1761172995540,"traceId":"c79427eeb334566c"},
+  {"name":"next-dev","duration":388911,"timestamp":3803629385649,"id":1,"tags":{},"startTime":1761173060014,"traceId":"c17a7e5be71a8193"},
+  {"name":"next-dev","duration":259585,"timestamp":3803632440741,"id":1,"tags":{},"startTime":1761173063069,"traceId":"24d82d9c47182d1c"}
+]
+[{"name":"next-dev","duration":346690,"timestamp":3805408597845,"id":1,"tags":{},"startTime":1761174839180,"traceId":"f9158a02c686f45e"}]
+[{"name":"next-dev","duration":435670,"timestamp":3813122898956,"id":1,"tags":{},"startTime":1761182553432,"traceId":"66e70a6eb9d46283"}]
+[{"name":"next-dev","duration":410791,"timestamp":5457683099931,"id":1,"tags":{},"startTime":1762827101982,"traceId":"4933ce47d8282d8a"}]
+[{"name":"next-dev","duration":398248,"timestamp":5774859996273,"id":1,"tags":{},"startTime":1763144276579,"traceId":"98c075989abb7e6d"}]

@@ -479,6 +479,7 @@ export default function CalendarPage() {
     
     try {
       // Save meeting to server
+      // Save meeting to server
       const { status, json } = await createMeetingOnServer(formData.title, startISO, endISO);
 
       setEvents((prev) =>
@@ -824,6 +825,7 @@ export default function CalendarPage() {
               </div>
             </div>
           )}
+          
 
           {/* Calendar */}
           <div className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">

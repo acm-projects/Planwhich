@@ -6,6 +6,7 @@ export type TaskStatusType = 'To-Do' | 'In Progress' | 'Complete';
 
 export interface Task {
   id: number;
+  taskID?: string;
   name: string;
   description: string;
   collaborators: string;
@@ -161,9 +162,10 @@ interface TaskStatusBoardProps {
     status: 'To Do' | 'In Progress' | 'Done';
     dueDate?: string;
   }) => Promise<any>;
+  onUpdateTaskStatus?: (taskID: string, newStatus: 'To Do' | 'In Progress' | 'Done') => Promise<void>;
 }
 
-const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], onCreateTask }) => {
+const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], onCreateTask, onUpdateTaskStatus }) => {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -191,6 +193,11 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Sync internal tasks state with initialTasks prop
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
 
   const formatDateForStorage = (dateString: string): string => {
     if (!dateString) return 'No date';
@@ -246,8 +253,18 @@ const TaskStatusBoard: React.FC<TaskStatusBoardProps> = ({ initialTasks = [], on
     }
   };
 
-  const handleStatusChange = (id: number, newStatus: TaskStatusType) => {
-    setTasks((prev) => prev.map((task) => (task.id === id ? { ...task, status: newStatus } : task)));
+  const handleStatusChange = async (id: number, newStatus: TaskStatusType) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    const apiStatus = newStatus === 'To-Do' ? 'To Do' : 
+                     newStatus === 'In Progress' ? 'In Progress' : 'Done';
+
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t)));
+
+    if (onUpdateTaskStatus && (task as any).taskID) {
+      await onUpdateTaskStatus((task as any).taskID, apiStatus);
+    }
   };
 
   const filteredTasks = tasks.filter((task) => task.name.toLowerCase().includes(searchQuery.toLowerCase()));
