@@ -1,3 +1,19 @@
+//** Tasks to complete (pseuodocode): - create lambda function to return all projects associated with user
+// - call lambda function to get list of projects and show them on dropdown
+// - in pre-existing lambda, include another parameter: project name. Get all the users associated
+// with that project, give it to openAI and prompt it to only include users whose names show up in 
+// that project on the tasks generated 
+// - REACH: Make the events and tasks persist through log ins and page refreshes by saving them to the backend database
+// - Meeting notes test summary: 
+// During this morning's product sync,  aaron.gheevar began by reviewing last week's progress 
+// on the mobile app. He mentioned that we still need to finalize the UI mockups before handing things off to development by 
+// next week. Rishi added that user-data syncing has improved after the recent fix, but he still needs to prepare a short 
+// performance summary for the leadership team before presenting this week. aaryaniraula007 brought up issues with customer 
+// onboarding and suggested updating the tutorial screens. She agreed to create a list of improvements to the onboarding flow. 
+// Kaitlyn said she would follow up with marketing to see whether they planned to highlight the new feature in this month's 
+// newsletter. Toward the end, Aaron reminded everyone that someone must schedule a call with the design contractor to discuss 
+// icon replacements before this week's meeting. The meeting wrapped up with Jonathan offering to send a brief summary of action items.
+// */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -9,8 +25,11 @@ import Navbar from "../components/Navbar";
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600"] });
 const localizer = momentLocalizer(moment);
 
-// hardcoded API endpoint
+// API endpoints
 const MEETINGS_API = "https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/dev/meetings";
+const TASKS_API = "https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/ExtractMeetingNotesTasks";
+const PROJECTS_API = "https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/projects";
+const TASKS_BACKEND_API = "https://bi98ye86yf.execute-api.us-east-1.amazonaws.com/begin/tasks";
 
 type UiEvent = {
   title: string;
@@ -18,43 +37,163 @@ type UiEvent = {
   end: Date;
   meetingID?: string;
   googleEventId?: string;
-  teamMembers?: string[];
+  projectId?: string;
   meetingNote?: string;
 };
+
+type Project = {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+};
+
+type ProjectMember = {
+  UserID: string;
+  username: string;
+  email: string;
+};
+
+// Function to fetch tasks from Lambda (OpenAI processing)
+async function fetchTasksFromLambda(meetingNotes: string, memberNames: string[]) {
+  try {
+    const response = await fetch(TASKS_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        textInput: meetingNotes,
+        projectMembers: memberNames
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.tags;
+  } catch (error) {
+    console.error('Error fetching tasks:', error);
+    return null;
+  }
+}
+
+// Parse OpenAI response into task objects
+function parseTasksFromAI(aiResponse: string) {
+  const lines = aiResponse.split('\n').filter(line => line.trim());
+  
+  return lines.map((line, index) => {
+    const cleanLine = line.replace(/^[-•*]\s*/, '').trim();
+    
+    if (!cleanLine || 
+        cleanLine.toLowerCase().includes('task description') ||
+        cleanLine.toLowerCase() === 'duedate' ||
+        cleanLine.length < 3) {
+      return null;
+    }
+    
+    // Match: "Name: Task by Date"
+    const matchWithDue = cleanLine.match(/^([^:]+):\s*(.+?)\s+by\s+(.+)$/i);
+    
+    if (matchWithDue) {
+      const name = matchWithDue[1].trim();
+      const taskText = matchWithDue[2].trim();
+      const dueDate = matchWithDue[3].trim();
+      
+      if (name.toLowerCase() === 'task' || 
+          name.toLowerCase() === 'personname' ||
+          taskText.toLowerCase().includes('task description') ||
+          dueDate.toLowerCase() === 'duedate') {
+        return null;
+      }
+      
+      return {
+        text: taskText,
+        assignedTo: name,
+        dueDate: dueDate
+      };
+    }
+    
+    // Match: "Name: Task"
+    const matchNoDue = cleanLine.match(/^([^:]+):\s*(.+)$/);
+    
+    if (matchNoDue) {
+      const name = matchNoDue[1].trim();
+      const taskText = matchNoDue[2].trim();
+      
+      if (name.toLowerCase() === 'task' || 
+          name.toLowerCase() === 'personname' ||
+          taskText.toLowerCase().includes('task description')) {
+        return null;
+      }
+      
+      return {
+        text: taskText,
+        assignedTo: name,
+        dueDate: null
+      };
+    }
+    
+    // Match: "Task by Date"
+    const matchTaskWithDue = cleanLine.match(/^(.+?)\s+by\s+(.+)$/i);
+    
+    if (matchTaskWithDue) {
+      const taskText = matchTaskWithDue[1].trim();
+      const dueDate = matchTaskWithDue[2].trim();
+      
+      if (taskText.toLowerCase().includes('task description') ||
+          dueDate.toLowerCase() === 'duedate') {
+        return null;
+      }
+      
+      return {
+        text: taskText,
+        assignedTo: null,
+        dueDate: dueDate
+      };
+    }
+    
+    return {
+      text: cleanLine,
+      assignedTo: null,
+      dueDate: null
+    };
+  }).filter(task => task !== null);
+}
 
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<UiEvent[]>([]);
   const [tasks, setTasks] = useState<
-    { id: number; date: string; text: string; status: string }[]
+    { id: number; date: string; text: string; status: string; projectId?: string }[]
   >([]);
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<UiEvent | null>(null);
   const [saving, setSaving] = useState(false);
+  const [generatingTasks, setGeneratingTasks] = useState(false);
+  const [taskGenerationError, setTaskGenerationError] = useState<string>("");
+  
+  // Project-related state
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  
   const [formData, setFormData] = useState({
     title: "",
     start: "",
     end: "",
-    teamMembers: [] as string[],
+    projectId: "",
     meetingNote: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const teamOptions = [
-    "Alice",
-    "Bob",
-    "Charlie",
-    "Diana",
-    "Ethan",
-    "Sarah",
-    "Jake",
-    "Maria",
-  ];
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -71,6 +210,146 @@ export default function CalendarPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Fetch user's projects when component mounts
+  useEffect(() => {
+    fetchUserProjects();
+  }, []);
+
+  // Fetch project members when a project is selected
+  useEffect(() => {
+    if (selectedProject) {
+      fetchProjectMembers(selectedProject);
+    } else {
+      setProjectMembers([]);
+    }
+  }, [selectedProject]);
+
+  const fetchUserProjects = async () => {
+    try {
+      setLoadingProjects(true);
+      const idToken = localStorage.getItem('idToken');
+      
+      if (!idToken) {
+        console.error('❌ No auth token');
+        return;
+      }
+
+      console.log('📋 Fetching user projects...');
+      
+      const response = await fetch(PROJECTS_API, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+
+      const data = await response.json();
+      console.log('✅ Projects fetched:', data);
+      setProjects(Array.isArray(data) ? data : []);
+      
+    } catch (error) {
+      console.error('❌ Error fetching projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const fetchProjectMembers = async (projectId: string) => {
+    try {
+      const idToken = localStorage.getItem('idToken');
+      
+      if (!idToken) {
+        console.error('❌ No auth token');
+        return;
+      }
+
+      console.log('👥 Fetching members for project:', projectId);
+      
+      const response = await fetch(
+        `${PROJECTS_API}/${projectId}/members`,
+        {
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch project members');
+      }
+
+      const data = await response.json();
+      console.log('✅ Project members fetched:', data);
+      setProjectMembers(Array.isArray(data) ? data : []);
+      
+    } catch (error) {
+      console.error('❌ Error fetching project members:', error);
+      setProjectMembers([]);
+    }
+  };
+
+  // NEW: Function to save task to backend
+  const saveTaskToBackend = async (taskData: {
+    taskName: string;
+    description: string;
+    assignedUserIDs: string[];
+    projectID: string;
+    status: 'To Do' | 'In Progress' | 'Done';
+    dueDate?: string;
+  }) => {
+    try {
+      const idToken = localStorage.getItem('idToken');
+      const userId = localStorage.getItem('userId');
+      
+      if (!idToken || !userId) {
+        throw new Error('Authentication required');
+      }
+
+      const taskID = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const dateCreated = new Date().toISOString();
+
+      const requestBody = {
+        taskID: taskID,
+        projectID: taskData.projectID,
+        taskName: taskData.taskName,
+        description: taskData.description,
+        assignedUserIDs: taskData.assignedUserIDs.length > 0 ? taskData.assignedUserIDs : [userId],
+        status: taskData.status,
+        dateCreated: dateCreated,
+        dueDate: taskData.dueDate,
+      };
+
+      console.log('💾 Saving task to backend:', requestBody);
+
+      const response = await fetch(TASKS_BACKEND_API, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save task');
+      }
+
+      const data = await response.json();
+      console.log('✅ Task saved to backend:', data);
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Error saving task to backend:', error);
+      return false;
+    }
+  };
 
   // Filter tasks for the selected day
   const tasksForDay = tasks.filter(
@@ -107,7 +386,7 @@ export default function CalendarPage() {
       ? tasksForDay
       : tasksForDay.filter((t) => t.status === filter);
 
-  // Get user ID (keep if needed for API authentication)
+  // Get user ID
   const getUserId = () => {
     try {
       return localStorage.getItem("userId") || "";
@@ -121,11 +400,13 @@ export default function CalendarPage() {
       title: "",
       start: "",
       end: "",
-      teamMembers: [],
+      projectId: "",
       meetingNote: "",
     });
+    setSelectedProject("");
     setEditingEvent(null);
     setShowForm(true);
+    setTaskGenerationError("");
   };
 
   const openEditForm = (event: UiEvent) => {
@@ -134,10 +415,12 @@ export default function CalendarPage() {
       title: event.title,
       start: moment(event.start).format("YYYY-MM-DDTHH:mm"),
       end: moment(event.end).format("YYYY-MM-DDTHH:mm"),
-      teamMembers: event.teamMembers || [],
+      projectId: event.projectId || "",
       meetingNote: event.meetingNote || "",
     });
+    setSelectedProject(event.projectId || "");
     setShowForm(true);
+    setTaskGenerationError("");
   };
 
   async function createMeetingOnServer(title: string, startISO: string, endISO: string) {
@@ -166,6 +449,11 @@ export default function CalendarPage() {
   const handleSaveEvent = async () => {
     if (!formData.title || !formData.start || !formData.end || saving) return;
 
+    if (!selectedProject) {
+      alert("Please select a project");
+      return;
+    }
+
     const startDate = new Date(formData.start);
     const endDate = new Date(formData.end);
     const startISO = startDate.toISOString();
@@ -175,7 +463,7 @@ export default function CalendarPage() {
       title: formData.title,
       start: startDate,
       end: endDate,
-      teamMembers: formData.teamMembers,
+      projectId: selectedProject,
       meetingNote: formData.meetingNote,
     };
 
@@ -187,10 +475,12 @@ export default function CalendarPage() {
     }
 
     setSaving(true);
+    setTaskGenerationError("");
+    
     try {
+      // Save meeting to server
       const { status, json } = await createMeetingOnServer(formData.title, startISO, endISO);
 
-      // Update with server response
       setEvents((prev) =>
         prev.map((ev) =>
           ev === optimistic
@@ -199,6 +489,84 @@ export default function CalendarPage() {
         )
       );
 
+      // Generate tasks from meeting notes if provided
+      if (formData.meetingNote && formData.meetingNote.trim()) {
+        setGeneratingTasks(true);
+        
+        // Get member usernames for OpenAI validation
+        const memberNames = projectMembers.map(m => m.username).filter(Boolean);
+        console.log('👥 Project members for validation:', memberNames);
+        
+        const tasksFromAPI = await fetchTasksFromLambda(formData.meetingNote, memberNames);
+        
+        if (tasksFromAPI) {
+          const parsedTasks = parseTasksFromAI(tasksFromAPI);
+          const dateKey = moment(startDate).format("YYYY-MM-DD");
+          
+          // Track successful and failed saves
+          let successCount = 0;
+          let failCount = 0;
+          
+          // Add generated tasks to the task list AND save to backend
+          const newTasks = [];
+          
+          for (const task of parsedTasks) {
+            // Find the assigned user's ID if a name was mentioned
+            let assignedUserIDs: string[] = [];
+            if (task.assignedTo) {
+              const matchedMember = projectMembers.find(
+                m => m.username?.toLowerCase() === task.assignedTo?.toLowerCase()
+              );
+              if (matchedMember) {
+                assignedUserIDs = [matchedMember.UserID];
+              }
+            }
+            
+            // Create local task for sidebar
+            const localTask = {
+              id: Date.now() + newTasks.length,
+              date: dateKey,
+              text: task.assignedTo 
+                ? `${task.assignedTo}: ${task.text}${task.dueDate ? ` (Due: ${task.dueDate})` : ''}`
+                : `${task.text}${task.dueDate ? ` (Due: ${task.dueDate})` : ''}`,
+              status: "todo",
+              projectId: selectedProject,
+            };
+            
+            newTasks.push(localTask);
+            
+            // Save to backend
+            const backendSuccess = await saveTaskToBackend({
+              taskName: task.text,
+              description: `Generated from meeting: ${formData.title}`,
+              assignedUserIDs: assignedUserIDs,
+              projectID: selectedProject,
+              status: 'To Do',
+              dueDate: task.dueDate || undefined,
+            });
+            
+            if (backendSuccess) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          }
+          
+          // Add all tasks to local state
+          setTasks((prev) => [...prev, ...newTasks]);
+          
+          // Show notification based on results
+          if (failCount > 0) {
+            setTaskGenerationError(
+              `Generated ${parsedTasks.length} tasks. ${successCount} saved to dashboard, ${failCount} failed to save.`
+            );
+          } else {
+            console.log(`✅ Generated and saved ${successCount} tasks for project ${selectedProject}`);
+          }
+        }
+        setGeneratingTasks(false);
+      }
+
       if (status === 207) {
         console.warn("Saved locally, Google sync failed:", json?.googleError);
         alert("Meeting saved. Google Calendar sync failed. You can retry later.");
@@ -206,13 +574,14 @@ export default function CalendarPage() {
     } catch (e: any) {
       console.error(e);
       alert(`Save failed: ${e.message || e}`);
-      // Rollback on error
       if (!editingEvent) {
         setEvents((prev) => prev.filter((ev) => ev !== optimistic));
       }
     } finally {
       setSaving(false);
-      setFormData({ title: "", start: "", end: "", teamMembers: [], meetingNote: "" });
+      setGeneratingTasks(false);
+      setFormData({ title: "", start: "", end: "", projectId: "", meetingNote: "" });
+      setSelectedProject("");
       setEditingEvent(null);
       setShowForm(false);
     }
@@ -271,6 +640,18 @@ export default function CalendarPage() {
               <option value="completed">Completed</option>
             </select>
           </div>
+
+          {generatingTasks && (
+            <div className="mb-4 p-3 bg-emerald-900/50 rounded-lg text-center text-sm">
+              Generating tasks from meeting notes...
+            </div>
+          )}
+
+          {taskGenerationError && (
+            <div className="mb-4 p-3 bg-yellow-900/50 rounded-lg text-center text-sm border border-yellow-600">
+              ⚠️ {taskGenerationError}
+            </div>
+          )}
 
           {/* Task Lists */}
           <div className="flex-1 overflow-y-auto space-y-6 pr-1">
@@ -335,7 +716,7 @@ export default function CalendarPage() {
           {/* Event Form Modal */}
           {showForm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
+              <div className="bg-white rounded-xl p-6 w-96 shadow-lg max-h-[90vh] overflow-y-auto">
                 <h2 className="text-xl font-semibold mb-4">
                   {editingEvent ? "Edit Event" : "Add Event"}
                 </h2>
@@ -366,75 +747,31 @@ export default function CalendarPage() {
                     className="border px-3 py-2 rounded-md"
                   />
 
-                  {/* Searchable Multi-select for Team Members */}
-                  <div ref={dropdownRef} className="relative">
+                  {/* Project Selector */}
+                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Add Team Members
+                      Select Project *
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className="w-full border rounded-md px-3 py-2 text-left bg-gray-50 hover:bg-gray-100 flex flex-wrap gap-1 items-center"
-                    >
-                      {formData.teamMembers.length > 0 ? (
-                        formData.teamMembers.map((member) => (
-                          <span
-                            key={member}
-                            className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-md"
-                          >
-                            {member}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-slate-500 text-sm">
-                          Select team members...
-                        </span>
-                      )}
-                    </button>
-
-                    {isDropdownOpen && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        <div className="sticky top-0 bg-white border-b p-2">
-                          <input
-                            type="text"
-                            placeholder="Search..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-2 py-1 border rounded-md text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                          />
-                        </div>
-
-                        {teamOptions
-                          .filter((member) =>
-                            member.toLowerCase().includes(searchTerm.toLowerCase())
-                          )
-                          .map((member) => (
-                            <label
-                              key={member}
-                              className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.teamMembers.includes(member)}
-                                onChange={(e) => {
-                                  const selected = e.target.checked
-                                    ? [...formData.teamMembers, member]
-                                    : formData.teamMembers.filter((m) => m !== member);
-                                  setFormData({ ...formData, teamMembers: selected });
-                                }}
-                                className="accent-emerald-500"
-                              />
-                              {member}
-                            </label>
-                          ))}
-
-                        {teamOptions.filter((m) =>
-                          m.toLowerCase().includes(searchTerm.toLowerCase())
-                        ).length === 0 && (
-                          <div className="px-3 py-2 text-slate-500 text-sm">
-                            No matches found.
-                          </div>
-                        )}
+                    {loadingProjects ? (
+                      <div className="text-sm text-slate-500 p-2">Loading projects...</div>
+                    ) : (
+                      <select
+                        value={selectedProject}
+                        onChange={(e) => setSelectedProject(e.target.value)}
+                        className="w-full border rounded-md px-3 py-2 bg-gray-50"
+                      >
+                        <option value="">Choose a project...</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {selectedProject && projectMembers.length > 0 && (
+                      <div className="mt-2 text-xs text-slate-600">
+                        <strong>Project members:</strong>{" "}
+                        {projectMembers.map(m => m.username).join(", ")}
                       </div>
                     )}
                   </div>
@@ -444,13 +781,16 @@ export default function CalendarPage() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">
                       Meeting Notes
                     </label>
+                    <p className="text-xs text-slate-500 mb-2">
+                      Tasks will be automatically generated, validated against project members, and saved to the dashboard.
+                    </p>
                     <textarea
                       value={formData.meetingNote}
                       onChange={(e) =>
                         setFormData({ ...formData, meetingNote: e.target.value })
                       }
-                      placeholder="Enter meeting details..."
-                      className="w-full border rounded-md px-3 py-2 text-sm h-24 resize-none"
+                      placeholder="Enter meeting details... (e.g., 'Sarah: Finalize UI mockups by Friday')"
+                      className="w-full border rounded-md px-3 py-2 text-sm h-32 resize-none"
                     />
                   </div>
                 </div>
@@ -465,17 +805,20 @@ export default function CalendarPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => setShowForm(false)}
+                    onClick={() => {
+                      setShowForm(false);
+                      setTaskGenerationError("");
+                    }}
                     className="bg-gray-300 px-3 py-1 rounded-md hover:bg-gray-400"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSaveEvent}
-                    disabled={saving}
+                    disabled={saving || generatingTasks || !selectedProject}
                     className="bg-emerald-500 text-white px-3 py-1 rounded-md hover:bg-emerald-600 disabled:bg-emerald-300"
                   >
-                    {saving ? "Saving..." : "Save"}
+                    {saving || generatingTasks ? "Saving..." : "Save"}
                   </button>
                 </div>
               </div>
